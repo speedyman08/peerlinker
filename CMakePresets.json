@@ -1,0 +1,15 @@
+{
+  "version": 3,
+  "configurePresets": [
+    {
+      "name": "vcpkg",
+      "description": "use vcpkg_installed directory",
+      "cacheVariables": {
+        "VCPKG": true,
+        "VCPKG_TRIPLET": "x64-windows-static-md",
+        "WITH_TESTER": "ON"
+      },
+      "generator": "Ninja"
+    }
+  ]
+}

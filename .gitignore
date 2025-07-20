@@ -1,0 +1,3 @@
+vpckg_installed/
+cmake-build-vcpkg/
+cmake-build-*/

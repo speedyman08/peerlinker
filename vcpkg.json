@@ -1,0 +1,10 @@
+{
+  "dependencies": [
+    {
+      "name": "asio"
+    },
+    {
+      "name": "cpr"
+    }
+  ]
+}
