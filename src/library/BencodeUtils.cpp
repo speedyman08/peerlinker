@@ -74,16 +74,39 @@ namespace peerlinker::bencode {
     std::vector<BenToken> decodeSequentialElements(std::string&& bencoded) {
         std::vector<BenToken> children {};
 
+        bool scopeEnded = false;
+        int skipCount = 0;
+
         for (int i = 1; i <= bencoded.length(); i++) {
-            std::string currentSubstr = bencoded.substr(bencoded.length() - i);
+            const int tailOffset = bencoded.length() - i;
+            std::string currentSubstr = bencoded.substr(tailOffset);
+
+            if (currentSubstr.front() == 'e' && !scopeEnded) {
+                skipCount++;
+            } else {
+                scopeEnded = true;
+            }
+
+            // skip until the needed delim appears
+            if ((currentSubstr.front() == 'l' || currentSubstr.front() == 'i') && skipCount >= 1) {
+                skipCount--;
+                if (skipCount != 0) {
+                    continue;
+                }
+            }
+
             auto type = determineType(currentSubstr);
 
             if (type == None) continue;
 
+            // success
             createListElement(type, currentSubstr, children);
 
             bencoded.erase(bencoded.length() - currentSubstr.length(), currentSubstr.length());
             if (bencoded.empty()) break;
+
+            scopeEnded = false;
+            skipCount = 0;
             i = 0;
         }
 
