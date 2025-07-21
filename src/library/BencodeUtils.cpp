@@ -2,6 +2,7 @@
 #include <fstream>
 #include <iostream>
 #include <sstream>
+#include <unordered_map>
 
 #include "Detection.h"
 #include "ListProcessing.h"
@@ -70,42 +71,19 @@ namespace peerlinker::bencode {
         }
     }
 
-    std::vector<ListEntry> decodeList(const std::string &bencoded) {
-        std::string copy = bencoded;
-        if (*bencoded.begin() != 'l' || bencoded.back() != 'e') {
-            throw std::invalid_argument("Invalid bencode list format (does not begin with l or e)");
-        }
-        std::vector<ListEntry> children;
+    std::vector<BenToken> decodeSequentialElements(std::string&& bencoded) {
+        std::vector<BenToken> children {};
 
-        // strip l and e
-        copy.erase(copy.begin());
-        copy.pop_back();
-
-        for (int i = 1; i <= copy.length(); i++) {
-            std::string currentSubstr = copy.substr(copy.length() - i);
+        for (int i = 1; i <= bencoded.length(); i++) {
+            std::string currentSubstr = bencoded.substr(bencoded.length() - i);
             auto type = determineType(currentSubstr);
 
             if (type == None) continue;
 
-            switch (type) {
-                case String: {
-                    createListElement(String, currentSubstr, children);
-                    break;
-                }
-                case Integer: {
-                    createListElement(Integer, currentSubstr, children);
-                    break;
-                }
+            createListElement(type, currentSubstr, children);
 
-                case List: {
-                    createListElement(List, currentSubstr, children);
-                    break;
-                }
-                default: ;
-            }
-
-            copy.erase(copy.length() - currentSubstr.length(), currentSubstr.length());
-            if (copy.empty()) break;
+            bencoded.erase(bencoded.length() - currentSubstr.length(), currentSubstr.length());
+            if (bencoded.empty()) break;
             i = 0;
         }
 
@@ -113,10 +91,43 @@ namespace peerlinker::bencode {
         return children;
     }
 
-    void createListElement(const bencodeType benType, const std::string &bencoded, std::vector<ListEntry> &children) {
-        ListEntry entry{
-            .benType = benType
-        };
+    std::vector<BenToken> decodeList(std::string bencoded) {
+        if (*bencoded.begin() != 'l' || bencoded.back() != 'e') {
+            throw std::invalid_argument("Invalid bencode list format (does not begin with l or e)");
+        }
+
+        // strip l and e
+        bencoded.erase(bencoded.begin());
+        bencoded.pop_back();
+
+        return decodeSequentialElements(std::move(bencoded));
+    }
+
+    std::unordered_map<std::string, BenToken> decodeDict(std::string bencoded) {
+        // strip identifying chars
+        bencoded.erase(bencoded.begin());
+        bencoded.pop_back();
+
+        std::vector<BenToken> children = decodeSequentialElements(std::move(bencoded));
+        if (children.size() < 2 || children.size() % 2 != 0) throw std::invalid_argument("Invalid bencode dict format");
+
+        std::unordered_map<std::string, BenToken> accumDict {};
+
+        for (int i = 0; i < children.size(); i += 2) {
+            auto key = children.at(i).expect<std::string>();
+            BenToken val = children.at(i + 1);
+
+            std::pair curPair {key, val};
+
+            accumDict.insert(curPair);
+        }
+
+        return accumDict;
+    }
+
+    void createListElement(const bencodeType benType, const std::string &bencoded,
+                           std::vector<BenToken> &children) {
+        BenToken entry { benType };
 
         switch (benType) {
             case String: {
@@ -131,17 +142,18 @@ namespace peerlinker::bencode {
                 entry.benValue = decodeList(bencoded);
                 break;
             }
+
+            case Dictionary: {
+                entry.benValue = decodeDict(bencoded);
+            }
             default: ;
         }
 
         children.push_back(entry);
     }
 
-    // TODO: ints
     bencodeType determineType(const std::string &bencoded) {
-        std::istringstream strStream{bencoded};
-
-        if (isString(bencoded, strStream)) {
+        if (isString(bencoded)) {
             return String;
         }
 
@@ -153,15 +165,20 @@ namespace peerlinker::bencode {
             return List;
         }
 
+        if (isDict(bencoded)) {
+            return Dictionary;
+        }
+
         return None;
     }
 
-    bool isString(const std::string &bencoded, std::istringstream &strStream) {
+    bool isString(const std::string &bencoded) {
+        std::istringstream strStream{bencoded};
+
         if (!std::isdigit(*bencoded.begin())) {
             return false;
         }
 
-        // now check for correctness, else return None
         if (bencoded.find(':') == std::string::npos) {
             return false;
         }
@@ -177,7 +194,6 @@ namespace peerlinker::bencode {
     }
 
     bool isInt(const std::string &bencoded) {
-        // end is an iterator, really a pointer, to the char one AFTER the end
         if (bencoded.front() == 'i' && bencoded.back() == 'e') return true;
 
         return false;
@@ -185,6 +201,12 @@ namespace peerlinker::bencode {
 
     bool isList(const std::string &bencoded) {
         if (bencoded.front() == 'l' && bencoded.back() == 'e') return true;
+
+        return false;
+    }
+
+    bool isDict(const std::string &bencoded) {
+        if (bencoded.front() == 'd' && bencoded.back() == 'e') return true;
 
         return false;
     }

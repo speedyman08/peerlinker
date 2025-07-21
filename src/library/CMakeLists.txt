@@ -1,6 +1,5 @@
 add_library(peerlinker STATIC
         BencodeUtils.cpp
-        ListEntry.cpp
 )
 
 target_link_libraries(

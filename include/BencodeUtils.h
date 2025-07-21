@@ -2,7 +2,7 @@
 
 #include <string>
 #include <vector>
-#include "ListEntry.h"
+#include "BenToken.h"
 
 namespace peerlinker::bencode {
     // Takes in a bencoded str, e.g 4:spam, would return "spam"
@@ -13,10 +13,11 @@ namespace peerlinker::bencode {
     int64_t decodeInt(const std::string &bencoded);
 
     // Takes in a bencoded list, e.g l4:spame, returns ["spam"]
-    std::vector<ListEntry> decodeList(const std::string &bencoded);
+    std::vector<BenToken> decodeList(std::string bencoded);
 
-    // In a dictionary, find the corresponding value of a key.
-    std::string findKey(std::string dictionary, std::string keyName);
+    std::unordered_map<std::string, BenToken> decodeDict(std::string bencoded);
+    // // In a dictionary, find the corresponding value of a key.
+    // std::string findKey(std::string dictionary, std::string keyName);
 
     bencodeType determineType(const std::string &bencoded);
 }
