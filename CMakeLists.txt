@@ -14,9 +14,29 @@ endif()
 find_package(curl CONFIG REQUIRED)
 find_package(cpr CONFIG REQUIRED)
 find_package(asio CONFIG REQUIRED)
+find_package(fmt CONFIG REQUIRED)
+find_package(magic_enum CONFIG REQUIRED)
 
 add_subdirectory(src/library)
 
 if(WITH_TESTER)
     add_subdirectory(src/tester)
 endif()
+
+set(CMAKE_INSTALL_PREFIX ${PROJECT_SOURCE_DIR}/staging/)
+
+install(
+    TARGETS peerlinker
+    EXPORT libpeerlinker
+    LIBRARY DESTINATION lib/peerlinker/
+)
+
+install(
+    EXPORT libpeerlinker
+    DESTINATION share/peerlinker/
+)
+
+install(
+    DIRECTORY ${PROJECT_SOURCE_DIR}/include/
+    DESTINATION include/peerlinker
+)

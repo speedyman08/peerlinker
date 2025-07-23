@@ -4,4 +4,6 @@ add_executable(peerlinkertest
 # Use public headers
 
 target_include_directories(peerlinkertest PRIVATE ../../include)
-target_link_libraries(peerlinkertest peerlinker)
+target_link_libraries(peerlinkertest
+        peerlinker
+)

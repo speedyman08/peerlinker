@@ -1,10 +1,11 @@
 {
-  "dependencies": [
-    {
-      "name": "asio"
-    },
-    {
-      "name": "cpr"
-    }
-  ]
+  "dependencies" : [ {
+    "name" : "asio"
+  }, {
+    "name" : "cpr"
+  }, {
+    "name" : "fmt"
+  }, {
+    "name" : "magic-enum"
+  } ]
 }

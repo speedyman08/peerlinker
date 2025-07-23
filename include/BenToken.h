@@ -4,14 +4,17 @@
 #include <string>
 #include <vector>
 #include <unordered_map>
+#include <BenType.h>
 
-#include "BenType.h"
 
 using namespace peerlinker::bencode;
+struct BenToken;
+
+typedef std::variant<int64_t, std::string, std::vector<BenToken>, std::unordered_map<std::string, BenToken>> possibleTypes;
 
 struct BenToken {
     bencodeType benType;
-    std::variant<int64_t, std::string, std::vector<BenToken>, std::unordered_map<std::string, BenToken>> benValue;
+    possibleTypes benValue;
 
     explicit BenToken(bencodeType benType) : benType(benType) {};
 
