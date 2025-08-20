@@ -92,6 +92,7 @@ public class Tracker
                        $"&downloaded=0" +
                        $"&uploaded=0" +
                        $"&left={TotalSize()}" +
+                       $"&numwant=50" +
                        $"&event=started" +
                        $"&compact=1";
         
@@ -118,12 +119,6 @@ public class Tracker
             Stream responseContent = trackerResponse.Content.ReadAsStream();
         
             responseDict = new BDictionaryParser(new BencodeParser()).Parse(responseContent);
-
-            if (Debug)
-            {
-                Console.WriteLine("Response Dump");
-                PrettyPrint.DebugDict(responseDict);
-            }
         }
         catch (TaskCanceledException)
         {
@@ -131,11 +126,23 @@ public class Tracker
             return;
         }
         
+        if (Debug)
+        {
+            var dump = new BDictionary(responseDict.Where(entry => entry.Key != "peers"));
+            Console.WriteLine("-- Response Dump --");
+            PrettyPrint.DebugDict(dump);
+        }
+        
         // Peer parsing
-        foreach (var peerIpv4 in ParsePeerList(responseDict))
+        var peers = ParsePeerList(responseDict);
+        
+        #if DEBUG
+        Console.WriteLine("-- Peer List --");
+        foreach (var peerIpv4 in peers)
         {
             Console.WriteLine(peerIpv4);
         }
+        #endif
     }
 
     private PeerIpv4[] ParsePeerList(BDictionary bResponse)
@@ -143,7 +150,7 @@ public class Tracker
         var peersBytes = BencodeHelper.GetKeyExcept<BString>(bResponse, "peers").Value;
         List<PeerIpv4> peers = new();
         
-        for (int i = 6; i < peersBytes.Length; i += 6)
+        for (int i = 6; i < peersBytes.Length + 1; i += 6)
         {
             var ipSlice = peersBytes.Slice(i - 6, 4);
             var portSlice = peersBytes.Slice(i - 2, 2);
