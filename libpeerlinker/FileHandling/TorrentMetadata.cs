@@ -43,15 +43,21 @@ public class TorrentMetadata
             Debug.Print(e.Message);
             throw new FileLoadException($"{filepath} inaccessible");
         }
-
-        var announceString = GetKeyExcept<BString>(benDict, "announce");
+        
+        #if DEBUG
+        Console.WriteLine($"-- {filepath} --");
+        PrettyPrint.DebugDict(benDict);
+        
+        #endif
+        
+        var announceString = BencodeHelper.GetKeyExcept<BString>(benDict, "announce");
         announceString.Encoding = Encoding.UTF8;
 
-        var infoDict = GetKeyExcept<BDictionary>(benDict, "info");
+        var infoDict = BencodeHelper.GetKeyExcept<BDictionary>(benDict, "info");
         
         // get pieces SHA-1 hash set
-        var hashes = GetKeyExcept<BString>(infoDict, "pieces");
-        var pieceLength = GetKeyExcept<BNumber>(infoDict, "piece length");
+        var hashes = BencodeHelper.GetKeyExcept<BString>(infoDict, "pieces");
+        var pieceLength = BencodeHelper.GetKeyExcept<BNumber>(infoDict, "piece length");
         
         // this is for calculating the info dict's SHA1 (needed in tracker requests)
         var infoDictRawBytes = infoDict.EncodeAsBytes()!;
@@ -80,7 +86,7 @@ public class TorrentMetadata
         var files = new List<TorrentFile>();
         
         // Used to understand if this is a multi or single file torrent (it does not exist on multi file torrents)
-        var length = GetKey<BNumber>(infoDict, "length");
+        var length = BencodeHelper.GetKey<BNumber>(infoDict, "length");
         
         // in a single file torrent, info -> length exists
         if (length is BNumber fileLength)
@@ -97,8 +103,8 @@ public class TorrentMetadata
 
     private TorrentFile MakeSingle(BDictionary benDict, BNumber fileLength)
     {
-        var fileName = GetKeyExcept<BString>(benDict, "name");
-        var pieceLength = GetKeyExcept<BNumber>(benDict, "piece length");
+        var fileName = BencodeHelper.GetKeyExcept<BString>(benDict, "name");
+        var pieceLength = BencodeHelper.GetKeyExcept<BNumber>(benDict, "piece length");
         
         return new TorrentFile 
         {
@@ -111,19 +117,19 @@ public class TorrentMetadata
 
     private TorrentFile[] MakeMulti(BDictionary benDict)
     {
-        var files = GetKeyExcept<BList>(benDict, "files");
+        var files = BencodeHelper.GetKeyExcept<BList>(benDict, "files");
         
         List<TorrentFile> objects = new();
         foreach (var o in files.Value)
         {
             var fileDict = (BDictionary)o;
             
-            var hierarchyListFromFile = GetKeyExcept<BList>(fileDict, "path");
+            var hierarchyListFromFile = BencodeHelper.GetKeyExcept<BList>(fileDict, "path");
             var normalisedHierarchy = hierarchyListFromFile
                 .Cast<BString>()
                 .Select(x => x.ToString()).ToArray();
             
-            var fileLen = GetKeyExcept<BNumber>(fileDict, "length");
+            var fileLen = BencodeHelper.GetKeyExcept<BNumber>(fileDict, "length");
 
             var pieces = (int) Math.Ceiling((double) fileLen / PieceLength);
             
@@ -138,21 +144,6 @@ public class TorrentMetadata
         }
         
         return objects.ToArray();
-    }
-
-
-    private static T GetKeyExcept<T>(BDictionary benDict, string key)
-    {
-        var val = GetKey<T>(benDict, key) ?? throw new TorrentMetadataException($"key {key} does not exist in the dictionary");
-        return val;
-    }
-    
-    
-    // returns null instead of throwing on non existent keys
-    private static T? GetKey<T>(BDictionary benDict, string key)
-    {
-        benDict.TryGetValue(key, out var value);
-        return (T) value;
     }
     
     public bool ProvidesOneFile() => AllFiles.Count == 1;

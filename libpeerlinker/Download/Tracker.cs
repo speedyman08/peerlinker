@@ -1,10 +1,12 @@
-﻿using System.Collections.Specialized;
+﻿using System.Buffers.Binary;
+using System.Collections.Specialized;
 using System.Net;
 using System.Text;
 using System.Text.Encodings.Web;
 using BencodeNET.Objects;
 using BencodeNET.Parsing;
 using libpeerlinker.FileHandling;
+using libpeerlinker.Peers;
 using Microsoft.VisualBasic.CompilerServices;
 
 namespace libpeerlinker.Tracker;
@@ -23,9 +25,6 @@ public class Tracker
     /// The version sent over in the peer identifier
     private Version m_ver;
     /// A flag for operating in debug mode.
-    /// In debug mode, the initial bencoded peer list (with compact=1) is requested for easier development, and all responses from peers and the tracker
-    /// will be dumped.
-    /// Without this, the initial list is binary encoded.
     public bool Debug { get; init; } = false;
     
     public Tracker(TorrentMetadata meta, Version clientVer)
@@ -86,15 +85,16 @@ public class Tracker
             encodedInfoHash += string.Concat("%", rawHexStr.AsSpan(i, 2));
         }
 
-        var queryStr = $"?info_hash={encodedInfoHash}" +
+        var queryStr = 
+                       $"?info_hash={encodedInfoHash}" +
                        $"&peer_id={m_identifier}" +
                        $"&port=6881" +
                        $"&downloaded=0" +
                        $"&uploaded=0" +
-                       $"&left={TotalPieces()}" +
-                       $"&event=started";
-
-
+                       $"&left={TotalSize()}" +
+                       $"&event=started" +
+                       $"&compact=1";
+        
         var fullUri = new Uri(m_httpClient.BaseAddress + queryStr, new UriCreationOptions
         {
             // god, what is this
@@ -104,7 +104,8 @@ public class Tracker
         Console.WriteLine($"Full URI: {fullUri}");
         
         HttpRequestMessage announceReq = new(HttpMethod.Get, fullUri);
-        
+
+        BDictionary responseDict;
         try
         {
             var trackerResponse = await m_httpClient.SendAsync(announceReq);
@@ -116,19 +117,48 @@ public class Tracker
             
             Stream responseContent = trackerResponse.Content.ReadAsStream();
         
-            BDictionary contentBencoded = new BDictionaryParser(new BencodeParser()).Parse(responseContent);
-        
-            Console.WriteLine("Response Dump");
-            PrettyPrint.DebugDict(contentBencoded);
+            responseDict = new BDictionaryParser(new BencodeParser()).Parse(responseContent);
+
+            if (Debug)
+            {
+                Console.WriteLine("Response Dump");
+                PrettyPrint.DebugDict(responseDict);
+            }
         }
         catch (TaskCanceledException)
         {
             Console.WriteLine($"Tracker {m_torrent.TrackerURL}timed out.");
+            return;
+        }
+        
+        // Peer parsing
+        foreach (var peerIpv4 in ParsePeerList(responseDict))
+        {
+            Console.WriteLine(peerIpv4);
         }
     }
 
-    private Int64 TotalPieces()
+    private PeerIpv4[] ParsePeerList(BDictionary bResponse)
     {
-        return m_torrent.AllFiles.Aggregate(0l, (pieces, file) => pieces += file.NumPieces);
+        var peersBytes = BencodeHelper.GetKeyExcept<BString>(bResponse, "peers").Value;
+        List<PeerIpv4> peers = new();
+        
+        for (int i = 6; i < peersBytes.Length; i += 6)
+        {
+            var ipSlice = peersBytes.Slice(i - 6, 4);
+            var portSlice = peersBytes.Slice(i - 2, 2);
+
+            var ip = new IPAddress(ipSlice.Span);
+            var port = BinaryPrimitives.ReadUInt16BigEndian(portSlice.Span);
+
+            peers.Add(new PeerIpv4(ip, port));
+        }
+
+        return peers.ToArray();
+    }
+
+    private Int64 TotalSize()
+    {
+        return m_torrent.AllFiles.Aggregate(0L, (bytes, file) => bytes += file.Size);
     }
 }

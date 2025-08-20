@@ -41,6 +41,16 @@ public class PrettyPrint
         foreach (var key in benDict.Keys)
         {
             TabNesting(nesting);
+            var keyVal = benDict[key];
+
+            if (keyVal is BString s)
+            {
+                if (s.Length > 200)
+                {
+                    Console.WriteLine($"{key}: [too long]");
+                    continue;
+                }
+            }
             Console.WriteLine($"{key}: {benDict[key]}");
 
             PrintComplex(benDict[key], nesting);
@@ -53,9 +63,24 @@ public class PrettyPrint
         foreach (var item in list)
         {
             TabNesting(nesting);
+            
+            if (item is BString s)
+            {
+                if (s.Length > 200)
+                {
+                    Console.WriteLine($"{idx+1}: too long");
+                    continue;
+                }
+            }
+            if (idx > 300)
+            {
+                Console.WriteLine("[too many items]");
+                break;
+            }
+            
             Console.WriteLine($"{idx + 1}: {item}");
+            
             idx++;
-
             PrintComplex(item, nesting);
         }
     }

@@ -1,7 +1,7 @@
 ﻿using libpeerlinker.FileHandling;
 using libpeerlinker.Tracker;
 
-TorrentMetadata meta = TorrentMetadata.FromFile("ubuntu.torrent");
+TorrentMetadata meta = TorrentMetadata.FromFile("fedora.torrent");
 
 Console.WriteLine($"Tracker {meta.TrackerURL}");
 
