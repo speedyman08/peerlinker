@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "libpeerlinker", "libpeerlinker\libpeerlinker.csproj", "{567F7E86-3CFD-4B94-8E8B-22911E6B8492}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "peerlinker", "peerlinker\peerlinker.csproj", "{4480DAA1-3388-4385-BC06-D37B60890E15}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{567F7E86-3CFD-4B94-8E8B-22911E6B8492}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{567F7E86-3CFD-4B94-8E8B-22911E6B8492}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{567F7E86-3CFD-4B94-8E8B-22911E6B8492}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{567F7E86-3CFD-4B94-8E8B-22911E6B8492}.Release|Any CPU.Build.0 = Release|Any CPU
+		{4480DAA1-3388-4385-BC06-D37B60890E15}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4480DAA1-3388-4385-BC06-D37B60890E15}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4480DAA1-3388-4385-BC06-D37B60890E15}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4480DAA1-3388-4385-BC06-D37B60890E15}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
