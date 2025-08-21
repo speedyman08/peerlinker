@@ -17,16 +17,13 @@ public class Tracker
 
     /// Underlying metadata file
     private TorrentMetadata m_torrent;
-    
+
     /// The version sent over in the peer identifier
     private Version m_ver;
-
-    /// A flag for operating in debug mode.
-    public bool Debug { get; init; } = false;
     
     /// Optional, use when picking specific files, sorting from meta.AllFiles list
     public TorrentFile[] FileSet { get; set; } = [];
-    
+
     /// A unique string to identify our client with length 20. Azureus style as that
     /// makes this information parsable to most other clients
     /// like: -PL0001-(8 random chars)
@@ -37,12 +34,12 @@ public class Tracker
         FileSet = meta.AllFiles.ToArray();
         ValidateVersion(clientVer);
         m_ver = clientVer;
-        
+
         m_httpClient = new HttpClient()
         {
             BaseAddress = new Uri(meta.TrackerURL)
         };
-        
+
         m_httpClient.DefaultRequestHeaders.Add("User-Agent", "peerlinker/1.0");
         m_httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
         m_torrent = meta;
@@ -106,7 +103,7 @@ public class Tracker
         {
             return FileSet.Sum(file => file.Size);
         }
-        
+
         // if fileset is empty, default is to consider all files in meta
         return m_torrent.AllFiles.Sum(file => file.Size);
     }
@@ -164,16 +161,14 @@ public class Tracker
             throw new TrackerException($"Timed out: {ex.Message}");
         }
 
-        if (Debug)
-        {
-            var dump = new BDictionary(responseDict.Where(
-                entry => entry.Key != "peers"
-                && entry.Key != "peers6"));
-            
-            Console.WriteLine("-- Response Dump --");
-            PrettyPrint.DebugDict(dump);
-        }
+#if DEBUG
+        var dump = new BDictionary(responseDict.Where(entry => 
+                                                                  entry.Key != "peers"
+                                                               && entry.Key != "peers6"));
 
+        Console.WriteLine("-- Response Dump --");
+        PrettyPrint.DebugDict(dump);
+#endif
         var peers = ParsePeerList(responseDict);
 
 #if DEBUG
@@ -191,7 +186,7 @@ public class Tracker
 
         seeders ??= 0;
         leechers ??= 0;
-        
+
         return new PeerTrackerData(
             peers,
             FileSet,

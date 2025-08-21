@@ -37,40 +37,41 @@ public class PeerManager
             
             Console.WriteLine($"Requesting pieces for file {m_tracker.FileSet[0]}");
             Console.WriteLine($"Using handshake (hex dump) {Convert.ToHexString(m_handshake)}");
-            // Handshake our peers given from the tracker in chunks of 10
+            // Handshake our peers given from the tracker in chunks of 20
             // store them in the known good peers list if they respond
-            for (int i = 0; i < initialTrackerInfo.TrackerPeers.Length; i += 10)
+            for (int i = 0; i < initialTrackerInfo.TrackerPeers.Length; i += 20)
             {
                 List<Task<bool>> handShakes = new();
-                Console.WriteLine($"-- Handshake Chunk({i}-{i + 10}) --");
-                for (int j = i; j < i + 10 && j < initialTrackerInfo.TrackerPeers.Length; j++)
+                Console.WriteLine($"-- Handshake Chunk({i}-{i + 20}) --");
+                for (int j = i; j < i + 20 && j < initialTrackerInfo.TrackerPeers.Length; j++)
                 {
                     handShakes.Add(
                         Handshake(initialTrackerInfo.TrackerPeers[j])
                     );
                 }
 
-                await Task.WhenAll(handShakes);
-
-                for (var currentTaskIdx = 0; currentTaskIdx < handShakes.Count; currentTaskIdx++)
+                while (handShakes.Count > 0)
                 {
-                    if (handShakes[currentTaskIdx].Result)
+                    Task<bool> handshakeTask = await Task.WhenAny(handShakes);
+                    var taskIndex = handShakes.IndexOf(handshakeTask);
+
+                    if (handshakeTask.Result)
                     {
-                        m_knownGoodPeers.Add(initialTrackerInfo.TrackerPeers[i + currentTaskIdx]);
+                        var peer = initialTrackerInfo.TrackerPeers[i + taskIndex];
+                        m_knownGoodPeers.Add(peer);
+                        Console.WriteLine($"Added {peer} to known good list.");
                     }
+                    handShakes.RemoveAt(taskIndex);
                 }
             }
-            
             Console.WriteLine($"Handshakes are FINISHED. Opening TCP Connections to {m_knownGoodPeers.Count} peers");
-            
-            
         }
         catch (TrackerException e)
         {
             Console.WriteLine("Did not get a successful announce");
         }
     }
-
+    
     private async Task<bool> Handshake(PeerIpv4 peer)
     {
         #if DEBUG
@@ -79,7 +80,7 @@ public class PeerManager
         TcpClient peerConn = new();
         try
         {
-            CancellationTokenSource connCts = new(TimeSpan.FromSeconds(2));
+            CancellationTokenSource connCts = new(TimeSpan.FromSeconds(10));
 
             await peerConn.ConnectAsync(peer.Ip.ToString(), peer.Port, connCts.Token);
             connCts.Dispose();
@@ -89,9 +90,9 @@ public class PeerManager
             // the handshake must be 68 bytes long
             byte[] response = new Byte[68];
 
-            CancellationTokenSource ctsForIo = new(TimeSpan.FromSeconds(2));
-            // we need to force it to close the stream, because ReadAsync and WriteAsync will sometimes behave badly and not care about our cancelled token
-            // causing a deadlock
+            CancellationTokenSource ctsForIo = new(TimeSpan.FromSeconds(20));
+            // we need to force it to close the stream, because ReadAsync and WriteAsync will
+            // sometimes behave badly and not care about our cancellation causing a deadlock
             // read and write will fail because it's disposed
             ctsForIo.Token.Register(() =>
             {
@@ -105,7 +106,7 @@ public class PeerManager
             ctsForIo.Dispose();
             await netStream.DisposeAsync();
 
-            Console.WriteLine($"Peer Response: {Convert.ToHexString(response)}");
+            Console.WriteLine($"{peer} Response: {Convert.ToHexString(response)}");
         }
         catch (OperationCanceledException)
         {
