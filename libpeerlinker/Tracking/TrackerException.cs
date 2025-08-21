@@ -1,3 +1,3 @@
-﻿namespace libpeerlinker.Tracker;
+﻿namespace libpeerlinker.Tracking;
 
 public class TrackerException(string msg) : Exception(msg);
