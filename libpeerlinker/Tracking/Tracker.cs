@@ -24,8 +24,7 @@ public class Tracker
     /// A flag for operating in debug mode.
     public bool Debug { get; init; } = false;
     
-    /// The files we will be exchanging
-    /// Prefer this to meta.AllFiles
+    /// Optional, use when picking specific files, sorting from meta.AllFiles list
     public TorrentFile[] FileSet { get; set; } = [];
     
     /// A unique string to identify our client with length 20. Azureus style as that
@@ -35,17 +34,18 @@ public class Tracker
 
     public Tracker(TorrentMetadata meta, Version clientVer)
     {
+        FileSet = meta.AllFiles.ToArray();
         ValidateVersion(clientVer);
         m_ver = clientVer;
-
+        
         m_httpClient = new HttpClient()
         {
             BaseAddress = new Uri(meta.TrackerURL)
         };
-
-        m_torrent = meta;
+        
         m_httpClient.DefaultRequestHeaders.Add("User-Agent", "peerlinker/1.0");
         m_httpClient.DefaultRequestHeaders.Add("Accept", "application/json");
+        m_torrent = meta;
         Identifier = GenId();
     }
 
@@ -166,7 +166,10 @@ public class Tracker
 
         if (Debug)
         {
-            var dump = new BDictionary(responseDict.Where(entry => entry.Key != "peers"));
+            var dump = new BDictionary(responseDict.Where(
+                entry => entry.Key != "peers"
+                && entry.Key != "peers6"));
+            
             Console.WriteLine("-- Response Dump --");
             PrettyPrint.DebugDict(dump);
         }
@@ -181,11 +184,18 @@ public class Tracker
         }
 #endif
 
+        // Sometimes, trackers will only send the interval and the compact peer list.
+        // so we can just zero out these optionals
+        var seeders = BencodeHelper.GetKey<BNumber>(responseDict, "complete");
+        var leechers = BencodeHelper.GetKey<BNumber>(responseDict, "incomplete");
+
+        seeders ??= 0;
+        leechers ??= 0;
+        
         return new PeerTrackerData(
             peers,
             FileSet,
-            BencodeHelper.GetKeyExcept<BNumber>(responseDict, "complete").Value,
-            BencodeHelper.GetKeyExcept<BNumber>(responseDict, "incomplete").Value
+            seeders, leechers
         );
     }
 }

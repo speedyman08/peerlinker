@@ -10,7 +10,7 @@ public class PeerManager
 {
     // Associated tracker
     private Tracker m_tracker;
-    /// Data from the torrent file, used for getting Info SHA1
+    /// Data from the torrent file
     private TorrentMetadata m_torrent;
     /// Struct representing the handshake packet
     private byte[] m_handshake;
@@ -62,6 +62,8 @@ public class PeerManager
             }
             
             Console.WriteLine($"Handshakes are FINISHED. Opening TCP Connections to {m_knownGoodPeers.Count} peers");
+            
+            
         }
         catch (TrackerException e)
         {
@@ -89,6 +91,7 @@ public class PeerManager
 
             CancellationTokenSource ctsForIo = new(TimeSpan.FromSeconds(2));
             // we need to force it to close the stream, because ReadAsync and WriteAsync will sometimes behave badly and not care about our cancelled token
+            // causing a deadlock
             // read and write will fail because it's disposed
             ctsForIo.Token.Register(() =>
             {

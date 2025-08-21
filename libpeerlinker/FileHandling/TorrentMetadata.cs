@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Security.Cryptography;
 using System.Text;
+using BencodeNET.Exceptions;
 using BencodeNET.Objects;
 using BencodeNET.Parsing;
 
@@ -49,9 +50,19 @@ public class TorrentMetadata
         PrettyPrint.DebugDict(benDict);
         
         #endif
-        
-        var announceString = BencodeHelper.GetKeyExcept<BString>(benDict, "announce");
-        announceString.Encoding = Encoding.UTF8;
+
+        BString announceString;
+        try
+        {
+            announceString = BencodeHelper.GetKeyExcept<BString>(benDict, "announce");
+            announceString.Encoding = Encoding.UTF8;
+        }
+        catch (BencodeException)
+        {
+            throw new TorrentMetadataException(
+                "No tracker is defined in the file. Most likely, this network makes use of DHT " +
+                "which isn't supported yet.");
+        }
 
         var infoDict = BencodeHelper.GetKeyExcept<BDictionary>(benDict, "info");
         

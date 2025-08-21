@@ -8,6 +8,8 @@ public unsafe struct HandshakeMessage
 {
     public byte identLen;
     public fixed byte protocolIdent[19];
+    // 8 null bytes
+    // later, this is treated like a byte field indicating features
     public fixed byte reservedBytes[8];
     public fixed byte infoDictHash[20];
     public fixed byte clientIdentifier[20];
@@ -35,7 +37,5 @@ public unsafe struct HandshakeMessage
             infoDictHash[i] = hash[i];
             clientIdentifier[i] = identifierBytes[i];
         }
-        
-        
     }
 }
