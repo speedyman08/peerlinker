@@ -18,6 +18,4 @@ var manager = new PeerManager(tracker, meta)
     SaveDirectory = Directory.GetCurrentDirectory(),
 };
 
-manager.StartDiscovery();
-
-await Task.Delay(-1);
+await manager.StartDiscovery();

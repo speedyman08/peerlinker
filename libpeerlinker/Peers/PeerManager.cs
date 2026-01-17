@@ -77,7 +77,7 @@ public class PeerManager
 
             Console.WriteLine($"Handshakes are FINISHED. Opening TCP Connections to {m_knownGoodPeers.Count} peers");
         }
-        catch (TrackerException e)
+        catch (TrackerException)
         {
             Console.WriteLine("Did not get a successful announce");
         }
@@ -85,80 +85,39 @@ public class PeerManager
 
     private async Task<bool> Handshake(PeerIpv4 peer)
     {
-#if DEBUG
-        Console.WriteLine($"Initiating handshake for {peer}");
-#endif
-        TcpClient peerConn = new();
+        using var peerConn = new TcpClient();
 
         try
         {
-            CancellationTokenSource connCts = new(TimeSpan.FromSeconds(10));
-
+            using var connCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             await peerConn.ConnectAsync(peer.Ip.ToString(), peer.Port, connCts.Token);
-            connCts.Dispose();
+
+            using var ioCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            using var _ = ioCts.Token.Register(peerConn.Dispose);
+
+            using var netStream = peerConn.GetStream();
+            byte[] response = new byte[68];
+
+            await netStream.WriteAsync(m_handshake, ioCts.Token);
+            await netStream.ReadExactlyAsync(response, 0, response.Length, ioCts.Token);
+
+            Console.WriteLine($"{peer} Response: {Convert.ToHexString(response)}");
+            return true;
         }
         catch (SocketException)
         {
-            peerConn.Dispose();
             Console.WriteLine($"{peer} refused the connection");
             return false;
         }
         catch (OperationCanceledException)
         {
-            peerConn.Dispose();
-            Console.WriteLine($"{peer} timed out connection");
-            return false;
-        }
-
-        CancellationTokenSource ctsForIo = new(TimeSpan.FromSeconds(20));
-        // we need to force it to close the stream, because ReadAsync and WriteAsync will
-        // sometimes behave badly and not care about our cancellation causing a deadlock
-        // read and write will fail because it's disposed
-        
-        ctsForIo.Token.Register(() =>
-        {
-            peerConn.Dispose();
-            Console.WriteLine($"{peer} is TAKING TOO LONG (Forced close)");
-        });
-        
-        try
-        {
-            var netStream = peerConn.GetStream();
-            // the handshake must be 68 bytes long
-            byte[] response = new Byte[68];
-            
-            await netStream.WriteAsync(new ReadOnlyMemory<byte>(m_handshake), ctsForIo.Token);
-            await netStream.ReadExactlyAsync(response, 0, response.Length, ctsForIo.Token);
-
-            ctsForIo.Dispose();
-            await netStream.DisposeAsync();
-
-            Console.WriteLine($"{peer} Response: {Convert.ToHexString(response)}");
-        }
-        catch (OperationCanceledException)
-        {
-            peerConn.Dispose();
-            ctsForIo.Dispose();
-            Console.WriteLine($"{peer} is TAKING TOO LONG");
-            return false;
-        }
-        catch (EndOfStreamException)
-        {
-            peerConn.Dispose();
-            ctsForIo.Dispose();
-            Console.WriteLine($"{peer} sent an EOF (probably does not have this info hash)");
+            Console.WriteLine($"{peer} timed out / IO too long");
             return false;
         }
         catch (IOException)
         {
-            peerConn.Dispose();
-            ctsForIo.Dispose();
-            Console.WriteLine($"{peer} refused the connection");
+            Console.WriteLine($"{peer} IO error");
             return false;
         }
-
-        peerConn.Dispose();
-
-        return true;
     }
 }

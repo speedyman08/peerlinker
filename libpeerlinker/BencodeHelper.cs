@@ -12,7 +12,6 @@ public class BencodeHelper
         return val;
     }
     
-    
     // returns null instead of throwing on non existent keys
     public static T? GetKey<T>(BDictionary benDict, string key)
     {

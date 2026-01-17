@@ -47,7 +47,7 @@ public class PrettyPrint
             {
                 if (s.Length > 200)
                 {
-                    Console.WriteLine($"{key}: [too long]");
+                    Console.WriteLine($"{key}: [{s.Length} characters]");
                     continue;
                 }
             }

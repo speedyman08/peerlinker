@@ -150,10 +150,17 @@ public class Tracker
             {
                 throw new TrackerException(trackerResponse.ReasonPhrase ?? "Unknown");
             }
-
+            
             Stream responseContent = trackerResponse.Content.ReadAsStream();
 
             responseDict = new BDictionaryParser(new BencodeParser()).Parse(responseContent);
+
+            var failure = BencodeHelper.GetKey<BString>(responseDict, "failure reason");
+
+            if (failure != null)
+            {
+                throw new TrackerException(failure.EncodeAsString());
+            }
         }
         catch (TaskCanceledException ex)
         {
