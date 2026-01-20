@@ -1,10 +1,11 @@
 ﻿using System.Runtime.InteropServices;
 using System.Text;
+using libpeerlinker.FileHandling;
 
 namespace libpeerlinker.Packets;
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
-public unsafe struct HandshakeMessage
+public unsafe struct Handshake
 {
     public byte identLen;
     public fixed byte protocolIdent[19];
@@ -14,7 +15,7 @@ public unsafe struct HandshakeMessage
     public fixed byte infoDictHash[20];
     public fixed byte clientIdentifier[20];
     
-    public HandshakeMessage(byte[] hash, string identifier)
+    public Handshake(byte[] hash, string identifier)
     {
         identLen = 19;
         
@@ -38,4 +39,6 @@ public unsafe struct HandshakeMessage
             clientIdentifier[i] = identifierBytes[i];
         }
     }
+    
+    public Handshake(TorrentMetadata meta, string identifier) : this(meta.InfoDictSHA1, identifier) {}
 }

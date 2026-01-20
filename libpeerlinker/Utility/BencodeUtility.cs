@@ -1,10 +1,8 @@
 ﻿using BencodeNET.Exceptions;
 using BencodeNET.Objects;
-using libpeerlinker.FileHandling;
-
 namespace libpeerlinker;
 
-public class BencodeHelper
+public class BencodeUtility
 {
     public static T GetKeyExcept<T>(BDictionary benDict, string key)
     {

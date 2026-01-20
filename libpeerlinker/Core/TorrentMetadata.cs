@@ -16,7 +16,7 @@ namespace libpeerlinker.FileHandling;
 public class TorrentMetadata
 {
     /// The list of files defined in the .torrent
-    public List<TorrentFile> AllFiles { get; set; }
+    public List<FileEntry> AllFiles { get; set; }
     /// The tracker's URL
     public required string TrackerURL { get; init; }
     
@@ -54,21 +54,21 @@ public class TorrentMetadata
         BString announceString;
         try
         {
-            announceString = BencodeHelper.GetKeyExcept<BString>(benDict, "announce");
+            announceString = BencodeUtility.GetKeyExcept<BString>(benDict, "announce");
             announceString.Encoding = Encoding.UTF8;
         }
         catch (BencodeException)
         {
-            throw new TorrentMetadataException(
+            throw new TorrentParsingException(
                 "No tracker is defined in the file. Most likely, this network makes use of DHT " +
                 "which isn't supported yet.");
         }
 
-        var infoDict = BencodeHelper.GetKeyExcept<BDictionary>(benDict, "info");
+        var infoDict = BencodeUtility.GetKeyExcept<BDictionary>(benDict, "info");
         
         // get pieces SHA-1 hash set
-        var hashes = BencodeHelper.GetKeyExcept<BString>(infoDict, "pieces");
-        var pieceLength = BencodeHelper.GetKeyExcept<BNumber>(infoDict, "piece length");
+        var hashes = BencodeUtility.GetKeyExcept<BString>(infoDict, "pieces");
+        var pieceLength = BencodeUtility.GetKeyExcept<BNumber>(infoDict, "piece length");
         
         // this is for calculating the info dict's SHA1 (needed in tracker requests)
         var infoDictRawBytes = infoDict.EncodeAsBytes()!;
@@ -84,7 +84,7 @@ public class TorrentMetadata
         {
             SHA1 infoHash = SHA1.Create();
             infoHash.ComputeHash(ms);
-            meta.InfoDictSHA1 = infoHash.Hash ?? throw new TorrentMetadataException("could not calculate the information dictionary SHA1");
+            meta.InfoDictSHA1 = infoHash.Hash ?? throw new TorrentParsingException("could not calculate the information dictionary SHA1");
         }
 
         meta.PopulateWithInfo(infoDict);
@@ -94,10 +94,10 @@ public class TorrentMetadata
 
     private void PopulateWithInfo(BDictionary infoDict)
     {
-        var files = new List<TorrentFile>();
+        var files = new List<FileEntry>();
         
         // Used to understand if this is a multi or single file torrent (it does not exist on multi file torrents)
-        var length = BencodeHelper.GetKey<BNumber>(infoDict, "length");
+        var length = BencodeUtility.GetKey<BNumber>(infoDict, "length");
         
         // in a single file torrent, info -> length exists
         if (length is BNumber fileLength)
@@ -112,12 +112,12 @@ public class TorrentMetadata
         AllFiles = files;
     }
 
-    private TorrentFile MakeSingle(BDictionary benDict, BNumber fileLength)
+    private FileEntry MakeSingle(BDictionary benDict, BNumber fileLength)
     {
-        var fileName = BencodeHelper.GetKeyExcept<BString>(benDict, "name");
-        var pieceLength = BencodeHelper.GetKeyExcept<BNumber>(benDict, "piece length");
+        var fileName = BencodeUtility.GetKeyExcept<BString>(benDict, "name");
+        var pieceLength = BencodeUtility.GetKeyExcept<BNumber>(benDict, "piece length");
         
-        return new TorrentFile 
+        return new FileEntry 
         {
             Size = fileLength.Value, // the file size
             SuggestedFilename = fileName.ToString(),
@@ -126,26 +126,26 @@ public class TorrentMetadata
         };
     }
 
-    private TorrentFile[] MakeMulti(BDictionary benDict)
+    private FileEntry[] MakeMulti(BDictionary benDict)
     {
-        var files = BencodeHelper.GetKeyExcept<BList>(benDict, "files");
+        var files = BencodeUtility.GetKeyExcept<BList>(benDict, "files");
         
-        List<TorrentFile> objects = new();
+        List<FileEntry> objects = new();
         foreach (var o in files.Value)
         {
             var fileDict = (BDictionary)o;
             
-            var hierarchyListFromFile = BencodeHelper.GetKeyExcept<BList>(fileDict, "path");
+            var hierarchyListFromFile = BencodeUtility.GetKeyExcept<BList>(fileDict, "path");
             var normalisedHierarchy = hierarchyListFromFile
                 .Cast<BString>()
                 .Select(x => x.ToString()).ToArray();
             
-            var fileLen = BencodeHelper.GetKeyExcept<BNumber>(fileDict, "length");
+            var fileLen = BencodeUtility.GetKeyExcept<BNumber>(fileDict, "length");
 
             var pieces = (int) Math.Ceiling((double) fileLen / PieceLength);
             
             objects.Add(
-                new TorrentFile
+                new FileEntry
                 {
                     DirectoryHierarchy = normalisedHierarchy,
                     SuggestedFilename = normalisedHierarchy[^1],

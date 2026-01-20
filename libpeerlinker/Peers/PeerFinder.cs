@@ -6,56 +6,45 @@ using libpeerlinker.Tracking;
 
 namespace libpeerlinker.Peers;
 
-public class PeerManager
+public class PeerFinder
 {
-    // Associated tracker
-    private Tracker m_tracker;
+    // Peers that have responded.
+    private readonly List<PeerIpv4> _knownGoodPeers = new();
 
-    /// Data from the torrent file
-    private TorrentMetadata m_torrent;
-
-    /// Struct representing the handshake packet
-    private byte[] m_handshake;
-
-    // Peers we have handshaked with
-    private List<PeerIpv4> m_knownGoodPeers = new();
-    public required string SaveDirectory { get; init; }
-
-    public PeerManager(Tracker tracker, TorrentMetadata meta)
+    private byte[]? _handshakeBytes;
+    
+    private byte[] MarshalHandshakeAsBytes(Handshake handshake)
     {
-        m_tracker = tracker;
-        m_torrent = meta;
-        var handshake = new HandshakeMessage(m_torrent.InfoDictSHA1, m_tracker.Identifier);
-
         var size = Marshal.SizeOf(handshake);
-        var bytebuf = new byte[size];
-        MemoryMarshal.Write(bytebuf, handshake);
-        m_handshake = bytebuf;
+        var byteBuf = new byte[size];
+        MemoryMarshal.Write(byteBuf, handshake);
+        return byteBuf;
     }
-
-    public async Task StartDiscovery()
+    
+    public async Task<DiscoveryResult> DiscoveryAsync(List<PeerIpv4> trackerPeers, Handshake handshake)
     {
+        _handshakeBytes =  MarshalHandshakeAsBytes(handshake);
+        
         try
         {
-            var initialTrackerInfo = await m_tracker.Announce();
-
-            Console.WriteLine($"Requesting pieces for file {m_tracker.FileSet[0]}");
-            Console.WriteLine($"Using handshake (hex dump) {Convert.ToHexString(m_handshake)}");
+            Console.WriteLine($"Using handshake {Convert.ToHexString(_handshakeBytes)}");
             // Handshake our peers given from the tracker in chunks of 20
             // store them in the known good peers list if they respond
-            for (int i = 0; i < initialTrackerInfo.TrackerPeers.Length; i += 20)
+            
+            var numPeers =  trackerPeers.Count;
+            for (int i = 0; i < numPeers; i += 20)
             {
                 // The lists of peers and their associated handshake task.
                 List<Task<bool>> handShakes = new();
                 List<PeerIpv4> peers = new();
-
+                
                 Console.WriteLine($"-- Handshake Chunk({i}-{i + 20}) --");
-                for (int j = i; j < i + 20 && j < initialTrackerInfo.TrackerPeers.Length; j++)
+                for (int j = i; j < i + 20 && j < numPeers; j++)
                 {
                     handShakes.Add(
-                        Handshake(initialTrackerInfo.TrackerPeers[j])
+                        Connect(trackerPeers[j])
                     );
-                    peers.Add(initialTrackerInfo.TrackerPeers[j]);
+                    peers.Add(trackerPeers[j]);
                 }
 
                 Console.WriteLine($"-- Results({i}-{i + 20})--");
@@ -66,7 +55,7 @@ public class PeerManager
 
                     if (task.Result)
                     {
-                        m_knownGoodPeers.Add(peers[idx]);
+                        _knownGoodPeers.Add(peers[idx]);
                         Console.WriteLine($"{peers[idx]} added to known good peers list");
                     }
 
@@ -75,38 +64,44 @@ public class PeerManager
                 }
             }
 
-            Console.WriteLine($"Handshakes are FINISHED. Opening TCP Connections to {m_knownGoodPeers.Count} peers");
+            
         }
-        catch (TrackerException)
+        catch (TrackerException e)
         {
             Console.WriteLine("Did not get a successful announce");
+            Console.WriteLine(e.Message);
         }
+        
+        return _knownGoodPeers.Count == 0 ? new DiscoveryResult(DiscoveryStatus.NoPeers, _knownGoodPeers) : new DiscoveryResult(DiscoveryStatus.Success, _knownGoodPeers);
     }
 
-    private async Task<bool> Handshake(PeerIpv4 peer)
+    private async Task<bool> Connect(PeerIpv4 peer)
     {
         using var peerConn = new TcpClient();
 
         try
         {
-            using var connCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+            using var connCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await peerConn.ConnectAsync(peer.Ip.ToString(), peer.Port, connCts.Token);
 
-            using var ioCts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+            using var ioCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
             using var _ = ioCts.Token.Register(peerConn.Dispose);
 
             using var netStream = peerConn.GetStream();
             byte[] response = new byte[68];
 
-            await netStream.WriteAsync(m_handshake, ioCts.Token);
+            await netStream.WriteAsync(_handshakeBytes, ioCts.Token);
             await netStream.ReadExactlyAsync(response, 0, response.Length, ioCts.Token);
-
-            Console.WriteLine($"{peer} Response: {Convert.ToHexString(response)}");
             return true;
         }
         catch (SocketException)
         {
             Console.WriteLine($"{peer} refused the connection");
+            return false;
+        }
+        catch (EndOfStreamException)
+        {
+            Console.WriteLine($"{peer} sent an EOF (peer active but not for this info hash)");
             return false;
         }
         catch (OperationCanceledException)

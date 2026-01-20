@@ -3,9 +3,8 @@ using libpeerlinker.Peers;
 
 namespace libpeerlinker.Peers;
 
-public record PeerTrackerData(
-    PeerIpv4[] TrackerPeers,
-    TorrentFile[] PickedFiles,
+public record AnnounceResponse(
+    List<PeerIpv4> TrackerPeers,
     Int64 Seeders,
     Int64 Leechers
 );

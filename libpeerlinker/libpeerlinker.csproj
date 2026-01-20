@@ -9,6 +9,7 @@
 
     <ItemGroup>
       <PackageReference Include="BencodeNET" Version="5.0.0" />
+      <PackageReference Include="SharpOpenNat" Version="4.0.17" />
     </ItemGroup>
 
 </Project>

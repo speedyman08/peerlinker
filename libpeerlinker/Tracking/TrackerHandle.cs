@@ -1,5 +1,6 @@
 ﻿using System.Buffers.Binary;
 using System.Net;
+using System.Security.Principal;
 using System.Text;
 using BencodeNET.Objects;
 using BencodeNET.Parsing;
@@ -11,7 +12,7 @@ namespace libpeerlinker.Tracking;
 /// <summary>
 /// A class which represents a tracker, currently allows for initialisation only with the <c>Announce()</c> method.
 /// </summary>
-public class Tracker
+public class TrackerHandle
 {
     private HttpClient m_httpClient;
 
@@ -20,22 +21,27 @@ public class Tracker
 
     /// The version sent over in the peer identifier
     private Version m_ver;
-    
+
     /// Optional, use when picking specific files, sorting from meta.AllFiles list
-    public TorrentFile[] FileSet { get; set; } = [];
+    
+    private List<FileEntry> _pickedFiles = new();
+    public List<FileEntry> PickedFiles
+    {
+        get => _pickedFiles.Count == 0 ? m_torrent.AllFiles : _pickedFiles;
+        set => _pickedFiles = value;
+    }
 
     /// A unique string to identify our client with length 20. Azureus style as that
     /// makes this information parsable to most other clients
     /// like: -PL0001-(8 random chars)
     public readonly string Identifier;
 
-    public Tracker(TorrentMetadata meta, Version clientVer)
+    public TrackerHandle(TorrentMetadata meta, Version clientVer)
     {
-        FileSet = meta.AllFiles.ToArray();
         ValidateVersion(clientVer);
         m_ver = clientVer;
 
-        m_httpClient = new HttpClient()
+        m_httpClient = new HttpClient
         {
             BaseAddress = new Uri(meta.TrackerURL)
         };
@@ -78,9 +84,9 @@ public class Tracker
         return id.ToString();
     }
 
-    private PeerIpv4[] ParsePeerList(BDictionary bResponse)
+    private List<PeerIpv4> ParsePeerList(BDictionary bResponse)
     {
-        var peersBytes = BencodeHelper.GetKeyExcept<BString>(bResponse, "peers").Value;
+        var peersBytes = BencodeUtility.GetKeyExcept<BString>(bResponse, "peers").Value;
         List<PeerIpv4> peers = new();
 
         for (int i = 6; i < peersBytes.Length + 1; i += 6)
@@ -94,14 +100,14 @@ public class Tracker
             peers.Add(new PeerIpv4(ip, port));
         }
 
-        return peers.ToArray();
+        return peers;
     }
 
     private Int64 TotalSize()
     {
-        if (FileSet.Any())
+        if (PickedFiles.Any())
         {
-            return FileSet.Sum(file => file.Size);
+            return PickedFiles.Sum(file => file.Size);
         }
 
         // if fileset is empty, default is to consider all files in meta
@@ -110,7 +116,7 @@ public class Tracker
 
     /// Sends an Announce request to the tracker described in the TorrentMetadata.
     /// You can additionally send over your downloaded and uploaded statistics if you're continuing a download / re announcing
-    public async Task<PeerTrackerData> Announce(Int64 downloadedBytes = 0, Int64 uploadedBytes = 0)
+    public async Task<AnnounceResponse> Announce(Int64 downloadedBytes = 0, Int64 uploadedBytes = 0)
     {
         var encodedInfoHash = "";
         var rawHexStr = Convert.ToHexString(m_torrent.InfoDictSHA1);
@@ -155,7 +161,7 @@ public class Tracker
 
             responseDict = new BDictionaryParser(new BencodeParser()).Parse(responseContent);
 
-            var failure = BencodeHelper.GetKey<BString>(responseDict, "failure reason");
+            var failure = BencodeUtility.GetKey<BString>(responseDict, "failure reason");
 
             if (failure != null)
             {
@@ -188,15 +194,14 @@ public class Tracker
 
         // Sometimes, trackers will only send the interval and the compact peer list.
         // so we can just zero out these optionals
-        var seeders = BencodeHelper.GetKey<BNumber>(responseDict, "complete");
-        var leechers = BencodeHelper.GetKey<BNumber>(responseDict, "incomplete");
+        var seeders = BencodeUtility.GetKey<BNumber>(responseDict, "complete");
+        var leechers = BencodeUtility.GetKey<BNumber>(responseDict, "incomplete");
 
         seeders ??= 0;
         leechers ??= 0;
 
-        return new PeerTrackerData(
+        return new AnnounceResponse(
             peers,
-            FileSet,
             seeders, leechers
         );
     }
