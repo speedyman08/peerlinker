@@ -131,4 +131,58 @@ public static class MessageFactory
             Payload = payload,
         };
     }
+    public static Message MakeBitfield(byte[] bitfield)
+    {
+        ArgumentNullException.ThrowIfNull(bitfield);
+
+        return new Message
+        {
+            Header = MakeHeader(bitfield.Length, MessageType.Bitfield),
+            Payload = bitfield,
+        };
+    }
+
+    public static Message MakeRequest(int pieceIdx, int blockOffset, int blockLength)
+    {
+        var payload = new byte[12];
+        BinaryPrimitives.WriteInt32BigEndian(payload.AsSpan(0, 4), pieceIdx);
+        BinaryPrimitives.WriteInt32BigEndian(payload.AsSpan(4, 4), blockOffset);
+        BinaryPrimitives.WriteInt32BigEndian(payload.AsSpan(8, 4), blockLength);
+
+        return new Message
+        {
+            Header = MakeHeader(12, MessageType.Request),
+            Payload = payload,
+        };
+    }
+
+    public static Message MakePiece(int pieceIdx, int blockOffset, byte[] blockData)
+    {
+        ArgumentNullException.ThrowIfNull(blockData);
+
+        var payload = new byte[8 + blockData.Length];
+        BinaryPrimitives.WriteInt32BigEndian(payload.AsSpan(0, 4), pieceIdx);
+        BinaryPrimitives.WriteInt32BigEndian(payload.AsSpan(4, 4), blockOffset);
+        blockData.CopyTo(payload, 8);
+
+        return new Message
+        {
+            Header = MakeHeader(payload.Length, MessageType.Piece),
+            Payload = payload,
+        };
+    }
+
+    public static Message MakeCancel(int pieceIdx, int blockOffset, int blockLength)
+    {
+        var payload = new byte[12];
+        BinaryPrimitives.WriteInt32BigEndian(payload.AsSpan(0, 4), pieceIdx);
+        BinaryPrimitives.WriteInt32BigEndian(payload.AsSpan(4, 4), blockOffset);
+        BinaryPrimitives.WriteInt32BigEndian(payload.AsSpan(8, 4), blockLength);
+
+        return new Message
+        {
+            Header = MakeHeader(12, MessageType.Cancel),
+            Payload = payload,
+        };
+    }
 }
