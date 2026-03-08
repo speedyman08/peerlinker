@@ -21,10 +21,6 @@ public class PeerConn
    public bool MeInterest { get; set; } = false;
    public bool PeerInterest { get; set; } = false;
    
-   /// <summary>
-   /// Constructor
-   /// </summary>
-   /// <param name="ip">IP of a verified Peer</param>
    /// <exception cref="PeerConnException">Thrown if the connection attempt fails</exception>
    PeerConn(PeerIpv4 ip)
    {

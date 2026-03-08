@@ -55,5 +55,5 @@ public unsafe struct Handshake
     }
 
 
-    public Handshake(TorrentMetadata meta, string identifier) : this(meta.InfoDictSHA1, identifier) {}
+    public Handshake(TorrentMetadata meta, string identifier) : this(meta.InfoDictSha1, identifier) {}
 }

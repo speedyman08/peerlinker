@@ -68,7 +68,7 @@ public class PrettyPrint
             {
                 if (s.Length > 200)
                 {
-                    Console.WriteLine($"{idx+1}: too long");
+                    Console.WriteLine($"{idx+1}: [{s.Length}] characters");
                     continue;
                 }
             }

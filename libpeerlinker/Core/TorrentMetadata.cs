@@ -16,18 +16,21 @@ namespace libpeerlinker.Tracking;
 public class TorrentMetadata
 {
     /// The list of files defined in the .torrent
-    public List<FileEntry> AllFiles { get; set; }
+    public List<FileEntry> AllFiles { get; private set; } = [];
+
     /// The tracker's URL
-    public required string TrackerURL { get; init; }
-    
+    public string TrackerUrl { get; private init; } = "";
+
     /// Array representing the SHA-1 of every single piece concatenated.
-    public byte[] PieceSHA1Hashes{ get; set; }
-    
+    public byte[] PieceSha1Hashes { get; private set; } = [];
+
     /// The SHA-1 of the info dictionary in the .torrent
-    public byte[] InfoDictSHA1 { get; set; }
+    public byte[] InfoDictSha1 { get; private set; } = [];
     
     /// The length in bytes of each piece
-    public required Int64 PieceLength { get; set; }
+    public Int64 PieceLength { get; private init; }
+
+    private TorrentMetadata() {}
 
     /// Factory method for parsing a file into a torrent metadata object
     public static TorrentMetadata FromFile(string filepath)
@@ -75,8 +78,9 @@ public class TorrentMetadata
         
         TorrentMetadata meta = new()
         {
-            TrackerURL = announceString.ToString(),
-            PieceSHA1Hashes = hashes.Value.ToArray(),
+            AllFiles = new List<FileEntry>(),
+            TrackerUrl = announceString.ToString(),
+            PieceSha1Hashes = hashes.Value.ToArray(),
             PieceLength = pieceLength.Value,
         };
         
@@ -84,32 +88,28 @@ public class TorrentMetadata
         {
             SHA1 infoHash = SHA1.Create();
             infoHash.ComputeHash(ms);
-            meta.InfoDictSHA1 = infoHash.Hash ?? throw new TorrentParsingException("could not calculate the information dictionary SHA1");
+            meta.InfoDictSha1 = infoHash.Hash ?? throw new TorrentParsingException("could not calculate the information dictionary SHA1");
         }
 
-        meta.PopulateWithInfo(infoDict);
+        meta.PopulateFilesWithInfo(infoDict);
         
         return meta;
     }
 
-    private void PopulateWithInfo(BDictionary infoDict)
+    private void PopulateFilesWithInfo(BDictionary infoDict)
     {
-        var files = new List<FileEntry>();
-        
         // Used to understand if this is a multi or single file torrent (it does not exist on multi file torrents)
         var length = BencodeUtility.GetKey<BNumber>(infoDict, "length");
         
         // in a single file torrent, info -> length exists
         if (length is BNumber fileLength)
         {
-            files.Add(MakeSingle(infoDict, fileLength));
+            AllFiles.Add(MakeSingle(infoDict, fileLength));
         }
         else
         {
-            files.AddRange(MakeMulti(infoDict));
+            AllFiles.AddRange(MakeMulti(infoDict));
         }
-
-        AllFiles = files;
     }
 
     private FileEntry MakeSingle(BDictionary benDict, BNumber fileLength)
@@ -169,7 +169,7 @@ public class TorrentMetadata
         
         int startOffset = 20 * piece;
 
-        return PieceSHA1Hashes.AsMemory().Slice(startOffset, 20);
+        return PieceSha1Hashes.AsMemory().Slice(startOffset, 20);
     }
     
     public bool ProvidesOneFile() => AllFiles.Count == 1;

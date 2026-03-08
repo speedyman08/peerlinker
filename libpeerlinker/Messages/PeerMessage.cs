@@ -33,7 +33,7 @@ public class Message
 {
     public MessageHeader Header { get; init; }
     public byte[]? Payload { get; init; }
-    public bool IsKeepAlive { get; init; } = false;
+    public bool IsKeepAlive { get; init; }
 
     public MessageType GetMsgType()
     {

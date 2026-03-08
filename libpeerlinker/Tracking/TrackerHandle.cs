@@ -47,7 +47,7 @@ public class TrackerHandle
 
         m_httpClient = new HttpClient
         {
-            BaseAddress = new Uri(meta.TrackerURL)
+            BaseAddress = new Uri(meta.TrackerUrl)
         };
 
         m_httpClient.DefaultRequestHeaders.Add("User-Agent", "peerlinker/1.0");
@@ -123,7 +123,7 @@ public class TrackerHandle
     public async Task<AnnounceResponse> Announce(Int64 downloadedBytes = 0, Int64 uploadedBytes = 0)
     {
         var encodedInfoHash = "";
-        var rawHexStr = Convert.ToHexString(m_torrent.InfoDictSHA1);
+        var rawHexStr = Convert.ToHexString(m_torrent.InfoDictSha1);
 
         for (int i = 0; i < rawHexStr.Length; i += 2)
         {
@@ -174,7 +174,7 @@ public class TrackerHandle
         }
         catch (TaskCanceledException ex)
         {
-            Console.WriteLine($"Tracker {m_torrent.TrackerURL}timed out.");
+            Console.WriteLine($"Tracker {m_torrent.TrackerUrl}timed out.");
             throw new TrackerException($"Timed out: {ex.Message}");
         }
 
