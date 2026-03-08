@@ -25,13 +25,45 @@ public enum MessageType : byte
     KeepAlive = 10, // a special case
 }
 
+/// <summary>
+/// A class representing every message that can be sent or received between peers
+/// Use the <c>MessageFactor</c> class to create this object
+/// </summary>
 public class Message
 {
     public MessageHeader Header { get; init; }
     public byte[]? Payload { get; init; }
     public bool IsKeepAlive { get; init; } = false;
+
+    public MessageType GetMsgType()
+    {
+        return IsKeepAlive ? MessageType.KeepAlive : Header.messageID;
+    }
     
-    // Do not use this if keepalive message
+    public byte[] EncodeAsBytes()
+    {
+        if (IsKeepAlive)
+        {
+            return new byte[] {0,0,0,0};
+        }
+
+        var payloadLen = Payload?.Length ?? 0;
+        var headerSize = Marshal.SizeOf(Header);
+        var byteBuf = new byte[headerSize + payloadLen];
+        MemoryMarshal.Write(byteBuf, Header);
+
+        if (Payload is null)
+        {
+            return byteBuf;
+        } 
+        Payload.CopyTo(byteBuf, headerSize);
+
+        return byteBuf;
+    }
+}
+
+public static class MessageFactory
+{
     private static unsafe MessageHeader MakeHeader(int payloadLength, MessageType id)
     {
         MessageHeader ms = new();
@@ -42,13 +74,7 @@ public class Message
         ms.messageID = id;
         
         return ms;
-    }
-
-    public MessageType GetMsgType()
-    {
-        return IsKeepAlive ? MessageType.KeepAlive : Header.messageID;
-    }
-    
+    } 
     public static Message MakeKeepAlive()
     {
         return new Message
@@ -93,26 +119,16 @@ public class Message
             Payload = null
         };
     }
-    
 
-    public byte[] EncodeAsBytes()
+    public static Message MakeHave(int pieceIdx)
     {
-        if (IsKeepAlive)
+        var payload = new byte[4];
+        BinaryPrimitives.WriteInt32BigEndian(payload, pieceIdx);
+
+        return new Message
         {
-            return new byte[] {0,0,0,0};
-        }
-
-        var payloadLen = Payload?.Length ?? 0;
-        var headerSize = Marshal.SizeOf(Header);
-        var byteBuf = new byte[headerSize + payloadLen];
-        MemoryMarshal.Write(byteBuf, Header);
-
-        if (Payload is null)
-        {
-            return byteBuf;
-        } 
-        Payload.CopyTo(byteBuf, payloadLen);
-
-        return byteBuf;
+            Header = MakeHeader(4, MessageType.Have),
+            Payload = payload,
+        };
     }
 }

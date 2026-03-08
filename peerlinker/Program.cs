@@ -6,9 +6,6 @@ using libpeerlinker.Messages;
 TorrentMetadata meta = TorrentMetadata.FromFile("debian.torrent");
 
 ReadOnlyMemory<byte> bytes = meta.GetPieceSha1(50);
-// Message example
-Message msg = Message.MakeInterested();
-var msgBytes = msg.EncodeAsBytes();
 
 Console.WriteLine($"Tracker {meta.TrackerURL}");
 
