@@ -27,7 +27,7 @@ public enum MessageType : byte
 
 /// <summary>
 /// A class representing every message that can be sent or received between peers
-/// Use the <c>MessageFactor</c> class to create this object
+/// Use the <c>MessageFactory</c> class to create this object
 /// </summary>
 public class Message
 {
