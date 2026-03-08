@@ -1,7 +1,6 @@
-﻿using libpeerlinker.FileHandling;
-using libpeerlinker.Peers;
+﻿using libpeerlinker.Peers;
 
-namespace libpeerlinker.Peers;
+namespace libpeerlinker.Messages;
 
 public record AnnounceResponse(
     List<PeerIpv4> TrackerPeers,

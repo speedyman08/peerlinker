@@ -1,13 +1,13 @@
-﻿using System.Collections.Immutable;
-using System.Diagnostics;
-using System.Runtime.CompilerServices;
+﻿using System.Diagnostics;
 using System.Security.Cryptography;
 using System.Text;
 using BencodeNET.Exceptions;
 using BencodeNET.Objects;
 using BencodeNET.Parsing;
+using libpeerlinker.Utility;
+using libpeerlinker.FileHandling;
 
-namespace libpeerlinker.FileHandling;
+namespace libpeerlinker.Tracking;
 
 /// <summary>
 /// An object representing the metadata found in .torrent files.
@@ -155,6 +155,21 @@ public class TorrentMetadata
         }
         
         return objects.ToArray();
+    }
+
+    /// <summary>
+    ///  Fetch the SHA1 hash of a specific piece by number
+    /// </summary>
+    /// <param name="piece">Piece number. Starts from 0</param>
+    /// <returns>A readonly slice of bytes</returns>
+    public ReadOnlyMemory<byte> GetPieceSha1(int piece)
+    {
+        long size = AllFiles.Sum(x => x.Size);
+        if (piece >= size / PieceLength) throw new ArgumentOutOfRangeException(nameof(piece));
+        
+        int startOffset = 20 * piece;
+
+        return PieceSHA1Hashes.AsMemory().Slice(startOffset, 20);
     }
     
     public bool ProvidesOneFile() => AllFiles.Count == 1;

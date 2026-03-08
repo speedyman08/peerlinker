@@ -1,9 +1,14 @@
-﻿using libpeerlinker.FileHandling;
-using libpeerlinker.Packets;
+﻿using libpeerlinker.Messages;
 using libpeerlinker.Peers;
 using libpeerlinker.Tracking;
+using libpeerlinker.Messages;
 
-TorrentMetadata meta = TorrentMetadata.FromFile("fedora.torrent");
+TorrentMetadata meta = TorrentMetadata.FromFile("debian.torrent");
+
+ReadOnlyMemory<byte> bytes = meta.GetPieceSha1(50);
+// Message example
+Message msg = Message.MakeInterested();
+var msgBytes = msg.EncodeAsBytes();
 
 Console.WriteLine($"Tracker {meta.TrackerURL}");
 

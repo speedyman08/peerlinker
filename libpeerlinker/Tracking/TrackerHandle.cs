@@ -1,11 +1,12 @@
 ﻿using System.Buffers.Binary;
 using System.Net;
-using System.Security.Principal;
 using System.Text;
 using BencodeNET.Objects;
 using BencodeNET.Parsing;
 using libpeerlinker.FileHandling;
 using libpeerlinker.Peers;
+using libpeerlinker.Utility;
+using libpeerlinker.Messages;
 
 namespace libpeerlinker.Tracking;
 
@@ -22,20 +23,23 @@ public class TrackerHandle
     /// The version sent over in the peer identifier
     private Version m_ver;
 
-    /// Optional, use when picking specific files, sorting from meta.AllFiles list
-    
-    private List<FileEntry> _pickedFiles = new();
     public List<FileEntry> PickedFiles
     {
-        get => _pickedFiles.Count == 0 ? m_torrent.AllFiles : _pickedFiles;
-        set => _pickedFiles = value;
-    }
+        get => field.Count == 0 ? m_torrent.AllFiles : field;
+        set;
+    } = new();
 
     /// A unique string to identify our client with length 20. Azureus style as that
     /// makes this information parsable to most other clients
     /// like: -PL0001-(8 random chars)
     public readonly string Identifier;
 
+    /// Initialize our handle
+    /// We need a metadata file and the client version to report to the tracker
+    /// client verison thing will probably be replaced with configuration injection
+    /// <param name="clientVer">A version to report to the tracker and other peers.</param>
+    /// <param name="meta">Object describing metadata. Needed for info dictionary hash computation</param>
+    
     public TrackerHandle(TorrentMetadata meta, Version clientVer)
     {
         ValidateVersion(clientVer);

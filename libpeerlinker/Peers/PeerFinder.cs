@@ -1,8 +1,7 @@
 ﻿using System.Net.Sockets;
 using System.Runtime.InteropServices;
-using libpeerlinker.FileHandling;
-using libpeerlinker.Packets;
 using libpeerlinker.Tracking;
+using libpeerlinker.Messages;
 
 namespace libpeerlinker.Peers;
 
@@ -81,6 +80,8 @@ public class PeerFinder
 
         try
         {
+            // connection cancellation shorter than io cancellation in order to provide more time for slow devices. simply to establish a connection we 
+            // dont need as much time
             using var connCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await peerConn.ConnectAsync(peer.Ip.ToString(), peer.Port, connCts.Token);
 
@@ -92,6 +93,12 @@ public class PeerFinder
 
             await netStream.WriteAsync(_handshakeBytes, ioCts.Token);
             await netStream.ReadExactlyAsync(response, 0, response.Length, ioCts.Token);
+            // valid at this point
+            
+            Handshake h = Handshake.FromBytes(response);
+            
+            Console.WriteLine(h);
+            
             return true;
         }
         catch (SocketException)

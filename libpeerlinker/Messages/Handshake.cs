@@ -1,8 +1,8 @@
 ﻿using System.Runtime.InteropServices;
 using System.Text;
-using libpeerlinker.FileHandling;
+using libpeerlinker.Tracking;
 
-namespace libpeerlinker.Packets;
+namespace libpeerlinker.Messages;
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct Handshake
@@ -20,10 +20,10 @@ public unsafe struct Handshake
         identLen = 19;
         
         if (hash.Length != 20){
-            throw new ArgumentOutOfRangeException("hash", "The info SHA1 is supposed to be 20 bytes long exactly.");
+            throw new ArgumentOutOfRangeException(nameof(hash), "The info SHA1 is supposed to be 20 bytes long exactly.");
         } else if (identifier.Length != 20)
         {
-            throw new ArgumentOutOfRangeException("identifier", "The client ID is supposed to be 20 bytes long exactly.");
+            throw new ArgumentOutOfRangeException(nameof(identifier), "The client ID is supposed to be 20 bytes long exactly.");
         }
 
         var identifierBytes = Encoding.ASCII.GetBytes(identifier);
@@ -39,6 +39,21 @@ public unsafe struct Handshake
             clientIdentifier[i] = identifierBytes[i];
         }
     }
-    
+
+    public static Handshake FromBytes(byte[] bytes)
+    {
+        return MemoryMarshal.Read<Handshake>(bytes);
+    }
+
+    public override string ToString()
+    {
+        fixed (byte* p = clientIdentifier)
+        {
+            string id = Encoding.ASCII.GetString(p, 20);
+            return $"Handshake {{ Identifier: {id} }}";
+        }
+    }
+
+
     public Handshake(TorrentMetadata meta, string identifier) : this(meta.InfoDictSHA1, identifier) {}
 }

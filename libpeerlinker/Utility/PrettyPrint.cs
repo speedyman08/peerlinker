@@ -1,6 +1,6 @@
 ﻿using BencodeNET.Objects;
 
-namespace libpeerlinker;
+namespace libpeerlinker.Utility;
 
 public class PrettyPrint
 {
