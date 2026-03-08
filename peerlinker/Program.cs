@@ -7,6 +7,15 @@ TorrentMetadata meta = TorrentMetadata.FromFile("debian.torrent");
 
 ReadOnlyMemory<byte> bytes = meta.GetPieceSha1(50);
 
+var msgRawBytes = new byte[]
+{
+    0, 0, 0, 9, 4, 0, 0, 0, 100
+};
+
+var msg = MessageFactory.MakeFromBytes(msgRawBytes);
+
+
+
 Console.WriteLine($"Tracker {meta.TrackerUrl}");
 
 var tracker = new TrackerHandle(meta, new Version(0, 0, 1));

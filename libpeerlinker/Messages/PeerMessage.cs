@@ -32,7 +32,7 @@ public enum MessageType : byte
 public class Message
 {
     public MessageHeader Header { get; init; }
-    public byte[]? Payload { get; init; }
+    public byte[]? Payload { get; set; }
     public bool IsKeepAlive { get; init; }
 
     public MessageType GetMsgType()
@@ -184,5 +184,27 @@ public static class MessageFactory
             Header = MakeHeader(12, MessageType.Cancel),
             Payload = payload,
         };
+    }
+
+    public static Message MakeFromBytes(byte[] bytes)
+    {
+        // handle special KeepAlive case
+        if (bytes.Length == 4 && BinaryPrimitives.ReadInt32BigEndian(bytes) == 0)
+        {
+            return MakeKeepAlive();
+        }
+        
+        // first 5 bytes -> header 
+        var header = MemoryMarshal.Read<MessageHeader>(bytes.AsSpan(0,5));
+        var payloadLen = bytes.Length - 5;
+       
+        var ms = new Message
+        {
+            Header = header,
+        };
+
+        ms.Payload = payloadLen == 0 ? null : bytes.AsSpan(5, payloadLen).ToArray();
+       
+        return ms;
     }
 }
