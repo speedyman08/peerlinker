@@ -11,7 +11,7 @@ public class PeerFinder
     private readonly List<PeerIpv4> _knownGoodPeers = new();
 
     private byte[]? _handshakeBytes;
-    
+
     private byte[] MarshalHandshakeAsBytes(Handshake handshake)
     {
         var size = Marshal.SizeOf(handshake);
@@ -19,29 +19,29 @@ public class PeerFinder
         MemoryMarshal.Write(byteBuf, handshake);
         return byteBuf;
     }
-    
+
     public async Task<DiscoveryResult> DiscoveryAsync(List<PeerIpv4> trackerPeers, Handshake handshake)
     {
-        _handshakeBytes =  MarshalHandshakeAsBytes(handshake);
-        
+        _handshakeBytes = MarshalHandshakeAsBytes(handshake);
+
         try
         {
             Console.WriteLine($"Using handshake {Convert.ToHexString(_handshakeBytes)}");
             // Handshake our peers given from the tracker in chunks of 20
             // store them in the known good peers list if they respond
-            
-            var numPeers =  trackerPeers.Count;
+
+            var numPeers = trackerPeers.Count;
             for (int i = 0; i < numPeers; i += 20)
             {
                 // The lists of peers and their associated handshake task.
                 List<Task<bool>> handShakes = new();
                 List<PeerIpv4> peers = new();
-                
+
                 Console.WriteLine($"-- Handshake Chunk({i}-{i + 20}) --");
                 for (int j = i; j < i + 20 && j < numPeers; j++)
                 {
                     handShakes.Add(
-                        Connect(trackerPeers[j])
+                        CheckConnection(trackerPeers[j])
                     );
                     peers.Add(trackerPeers[j]);
                 }
@@ -62,26 +62,25 @@ public class PeerFinder
                     handShakes.RemoveAt(idx);
                 }
             }
-
-            
         }
         catch (TrackerException e)
         {
             Console.WriteLine("Did not get a successful announce");
             Console.WriteLine(e.Message);
         }
-        
-        return _knownGoodPeers.Count == 0 ? new DiscoveryResult(DiscoveryStatus.NoPeers, _knownGoodPeers) : new DiscoveryResult(DiscoveryStatus.Success, _knownGoodPeers);
+
+        return _knownGoodPeers.Count == 0
+            ? new DiscoveryResult(DiscoveryStatus.NoPeers, _knownGoodPeers)
+            : new DiscoveryResult(DiscoveryStatus.Success, _knownGoodPeers);
     }
 
-    private async Task<bool> Connect(PeerIpv4 peer)
+    public async Task<PeerConn?> HandshakeAsync(PeerIpv4 peer)
     {
-        using var peerConn = new TcpClient();
-
         try
         {
-            // connection cancellation shorter than io cancellation in order to provide more time for slow devices. simply to establish a connection we 
-            // dont need as much time
+            var peerConn = new TcpClient();
+
+            // connection cancellation shorter than io cancellation in order to provide more time for slow devices. simply to establish a connection we // dont need as much time
             using var connCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             await peerConn.ConnectAsync(peer.Ip.ToString(), peer.Port, connCts.Token);
 
@@ -93,33 +92,41 @@ public class PeerFinder
 
             await netStream.WriteAsync(_handshakeBytes, ioCts.Token);
             await netStream.ReadExactlyAsync(response, 0, response.Length, ioCts.Token);
-            // valid at this point
-            
             Handshake h = Handshake.FromBytes(response);
-            
             Console.WriteLine(h);
-            
-            return true;
+
+            return new PeerConn(peerConn);
         }
         catch (SocketException)
         {
             Console.WriteLine($"{peer} refused the connection");
-            return false;
+            return null;
         }
         catch (EndOfStreamException)
         {
             Console.WriteLine($"{peer} sent an EOF (peer active but not for this info hash)");
-            return false;
+            return null;
         }
         catch (OperationCanceledException)
         {
             Console.WriteLine($"{peer} timed out / IO too long");
-            return false;
+            return null;
         }
         catch (IOException)
         {
             Console.WriteLine($"{peer} IO error");
-            return false;
+            return null;
         }
+        catch
+        {
+            Console.WriteLine($"{peer} unknown error");
+            return null;
+        }
+    }
+
+    private async Task<bool> CheckConnection(PeerIpv4 peer)
+    {
+        var peerConn = await HandshakeAsync(peer);
+        return peerConn is not null;
     }
 }

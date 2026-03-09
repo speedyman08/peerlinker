@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Net.Sockets;
 using libpeerlinker.Peers;
 
@@ -8,19 +9,37 @@ namespace libpeerlinker.Exchange;
 /// </summary>
 public class PieceFetcher(List<PeerIpv4> reachablePeers)
 {
-    private List<PeerIpv4> _reachablePeers { get; } = reachablePeers; 
-    private List<TcpClient> _activeConnections { get; set; }
+    private List<PeerIpv4> _reachablePeers { get; } = reachablePeers;
+    private BindingList<PeerConn> _activeConnections { get; } = new();
 
-    async Task StartPopulatingConns()
+    //async Task StartPopulatingConns()
+    //{
+     //  if (_activeConnections.Count == 0)
+      // {
+       //    for (int i = 0; i < 10; i++)
+        //   {
+               // take random
+         //      await Task.Run(() =>
+               //{
+          //         var peer = _reachablePeers[Random.Shared.Next(0, _reachablePeers.Count)];
+          //         _activeConnections.Add(new PeerConn(peer));
+           //    });
+          // } 
+       //}
+    //}
+
+    //useless peers go away
+    private void KillPeer(PeerConn conn)
     {
-       // rank by usability 
+    //    _activeConnections.Remove(conn);
     }
-
+    private void GetBitField()
+    {
+        
+    }
+    
     async Task Start()
     {
-       // a long running task in the background starting some connections we can probably reuse. it contains "Useful" tcp connections
-       await Task.Run(StartPopulatingConns);
-       
-       
+       //await Task.Run(StartPopulatingConns);
     }
 }
