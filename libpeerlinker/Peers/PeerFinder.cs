@@ -10,8 +10,9 @@ public class PeerFinder
     // Peers that have responded.
     private readonly List<PeerIpv4> _knownGoodPeers = new();
 
-    private byte[]? _handshakeBytes;
-
+    private readonly byte[] _handshakeBytes;
+    
+    
     private byte[] MarshalHandshakeAsBytes(Handshake handshake)
     {
         var size = Marshal.SizeOf(handshake);
@@ -19,11 +20,14 @@ public class PeerFinder
         MemoryMarshal.Write(byteBuf, handshake);
         return byteBuf;
     }
-
-    public async Task<DiscoveryResult> DiscoveryAsync(List<PeerIpv4> trackerPeers, Handshake handshake)
+    
+    public PeerFinder(Handshake handshake)
     {
         _handshakeBytes = MarshalHandshakeAsBytes(handshake);
-
+    }
+    
+    public async Task<DiscoveryResult> DiscoveryAsync(List<PeerIpv4> trackerPeers, Handshake handshake)
+    {
         try
         {
             Console.WriteLine($"Using handshake {Convert.ToHexString(_handshakeBytes)}");
@@ -55,7 +59,7 @@ public class PeerFinder
                     if (task.Result)
                     {
                         _knownGoodPeers.Add(peers[idx]);
-                        Console.WriteLine($"{peers[idx]} added to known good peers list");
+                        Console.WriteLine($"{peers[idx]} added to reachable peers");
                     }
 
                     peers.RemoveAt(idx);
@@ -74,28 +78,37 @@ public class PeerFinder
             : new DiscoveryResult(DiscoveryStatus.Success, _knownGoodPeers);
     }
 
+    /// <summary>
+    /// HandshakeAsync returns a PeerConn object if successful handshake, null otherwise.
+    /// Keep the connection stored in the PeerConn object alive for later
+    /// </summary>
+    /// <param name="peer">Object containing IP info</param>
     public async Task<PeerConn?> HandshakeAsync(PeerIpv4 peer)
     {
         try
         {
-            var peerConn = new TcpClient();
+            var conn = new TcpClient();
 
-            // connection cancellation shorter than io cancellation in order to provide more time for slow devices. simply to establish a connection we // dont need as much time
-            using var connCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            await peerConn.ConnectAsync(peer.Ip.ToString(), peer.Port, connCts.Token);
+            using var connCts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+            await conn.ConnectAsync(peer.Ip.ToString(), peer.Port, connCts.Token);
 
-            using var ioCts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            using var _ = ioCts.Token.Register(peerConn.Dispose);
+            using var ioCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            using var _ = ioCts.Token.Register(conn.Dispose);
 
-            using var netStream = peerConn.GetStream();
+            using var netStream = conn.GetStream();
             byte[] response = new byte[68];
 
             await netStream.WriteAsync(_handshakeBytes, ioCts.Token);
             await netStream.ReadExactlyAsync(response, 0, response.Length, ioCts.Token);
-            Handshake h = Handshake.FromBytes(response);
-            Console.WriteLine(h);
 
-            return new PeerConn(peerConn);
+            Handshake responseHandshake = Handshake.FromBytes(response);
+            
+            PeerConn peerConn = new(conn)
+            {
+                InitialHandshake = responseHandshake,
+            };
+
+            return peerConn;
         }
         catch (SocketException)
         {

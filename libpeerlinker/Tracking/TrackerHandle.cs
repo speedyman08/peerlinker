@@ -5,8 +5,8 @@ using BencodeNET.Objects;
 using BencodeNET.Parsing;
 using libpeerlinker.FileHandling;
 using libpeerlinker.Peers;
-using libpeerlinker.Utility;
 using libpeerlinker.Messages;
+using libpeerlinker.Utility;
 
 namespace libpeerlinker.Tracking;
 

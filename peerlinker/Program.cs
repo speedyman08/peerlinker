@@ -1,4 +1,5 @@
-﻿using libpeerlinker.Messages;
+﻿using libpeerlinker.Exchange;
+using libpeerlinker.Messages;
 using libpeerlinker.Peers;
 using libpeerlinker.Tracking;
 using libpeerlinker.Messages;
@@ -24,7 +25,7 @@ var res = await tracker.Announce();
 // we need an initial message
 var handshake = new Handshake(meta, tracker.Identifier);
 
-PeerFinder finder = new();
+PeerFinder finder = new(handshake);
 
 var discoveryResult = await finder.DiscoveryAsync(res.TrackerPeers, handshake);
 
@@ -33,7 +34,10 @@ if (discoveryResult.Status == DiscoveryStatus.NoPeers)
     Console.WriteLine("No peers found. Are we cooked?");
 }
 
-discoveryResult.RespondingPeers.ForEach(Console.WriteLine);
+var fetcher = new PieceFetcher(discoveryResult.RespondingPeers, handshake);
+
+await fetcher.Start();
+
 
 // using CancellationTokenSource cts = new(20000);
 //
