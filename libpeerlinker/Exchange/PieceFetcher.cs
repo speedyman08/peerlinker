@@ -1,5 +1,4 @@
 using System.ComponentModel;
-using System.Net.Sockets;
 using libpeerlinker.Messages;
 using libpeerlinker.Peers;
 
@@ -10,11 +9,11 @@ namespace libpeerlinker.Exchange;
 /// </summary>
 public class PieceFetcher
 {
-    private readonly List<PeerIpv4> _reachablePeers;
+    private readonly List<PeerConn> _reachablePeers;
     private readonly PeerFinder _finder;
     private BindingList<PeerConn> ActiveConnections { get; } = [];
 
-    public PieceFetcher(List<PeerIpv4> reachable, Handshake handshake) 
+    public PieceFetcher(List<PeerConn> reachable, Handshake handshake) 
     {
        _finder = new PeerFinder(handshake);
        _reachablePeers = reachable;
@@ -26,43 +25,34 @@ public class PieceFetcher
     {
        if (ActiveConnections.Count != 0)
           return;
-
-       List<Task<PeerConn?>> connectionAttempts = [];
-
-       for (int i = 0; i < 10; i++)
-       {
-          int index = Random.Shared.Next(0, _reachablePeers.Count);
-          connectionAttempts.Add(_finder.HandshakeAsync(_reachablePeers[index]));
-       }
-
-       PeerConn?[] results = await Task.WhenAll(connectionAttempts);
-
-       foreach (var peerConn in results)
-       {
-          if (peerConn is not null)
-             ActiveConnections.Add(peerConn);
-       }
+       
+       var chosenPeers = _reachablePeers.Shuffle().Take(_reachablePeers.Count / 2).ToList();
+       chosenPeers.ForEach(i => Console.WriteLine($"Considering {i.InitialHandshake} as first candidate"));
+       chosenPeers.ForEach(i => ActiveConnections.Add(i));
     }
 
-    void OnConnect(object? sender, ListChangedEventArgs e)
+    async void OnConnect(object? sender, ListChangedEventArgs e)
     {
        if (e.ListChangedType == ListChangedType.ItemAdded)
        {
           var handle = ActiveConnections[e.NewIndex];
-          Console.WriteLine($"Got a new long standing connection, we shook with {handle.InitialHandshake}"); 
+          var res = await handle.GetBitField();
+          if (!res)
+          {
+             Console.WriteLine($"(PieceFetcher): failed to get bitfield for {handle.InitialHandshake}");
+             KillPeer(handle);
+             return;
+          }
+          
+          Console.WriteLine($"(PieceFetcher): Got bitfield for {handle.InitialHandshake}");
        }
     }
 
-    //useless peers go away
     void KillPeer(PeerConn conn)
     {
-    //    _activeConnections.Remove(conn);
-    } 
-    void GetBitField()
-    {
-        
+       ActiveConnections.Remove(conn);
+       conn.Dispose();
     }
-    
     public async Task Start()
     {
        await StartPopulatingConns();

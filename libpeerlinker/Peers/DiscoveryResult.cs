@@ -6,4 +6,4 @@ public enum DiscoveryStatus
     NoPeers,
 }
 
-public record DiscoveryResult(DiscoveryStatus Status, List<PeerIpv4> RespondingPeers);
+public record DiscoveryResult(DiscoveryStatus Status, List<PeerConn> RespondingPeers);

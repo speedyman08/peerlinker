@@ -8,7 +8,7 @@ namespace libpeerlinker.Peers;
 /// <summary>
 ///  A shim for a TCP connection. Long running.
 /// </summary>
-public class PeerConn
+public class PeerConn : IDisposable
 {
    /// <summary>
    /// Heuristic value 0-10 depicting how useful a peer has been to me
@@ -33,21 +33,60 @@ public class PeerConn
    }
    ~PeerConn()
    {
-      Connection.Close();
-      Connection.Dispose();
+      Dispose(false);
    }
 
-   public async Task GetBitField()
+   public async Task<bool> GetBitField()
    {
-      var ns = Connection.GetStream();
-      byte[] msgLenBytes = [];
-      await ns.ReadExactlyAsync(msgLenBytes, 0, 4);
-      var msgLenAsInt = BinaryPrimitives.ReadInt32BigEndian(msgLenBytes);
+      try
+      {
+         var ctsSource = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
-      byte[] fullMsg = [];
-      await ns.ReadExactlyAsync(fullMsg, 0, msgLenAsInt);
-      Message bitFieldMsg = MessageFactory.MakeFromBytes(fullMsg);
-      BitField = bitFieldMsg.Payload ?? throw new NullReferenceException("Bitfield payload is null, therefore peer message parsed incorrectly");
+         var ns = Connection.GetStream();
+         var msgLenBytes = new byte[4];
+         await ns.ReadExactlyAsync(msgLenBytes, 0, 4, ctsSource.Token);
+         var msgLenAsInt = BinaryPrimitives.ReadInt32BigEndian(msgLenBytes);
+
+         if (msgLenAsInt == 0)
+         {
+            Console.WriteLine("Got a keepalive, ignoring for now im only checking bitfields");
+            return false;
+         }
+
+         var fullMsg = new byte[msgLenAsInt];
+         msgLenBytes.CopyTo(fullMsg, 0);
+         
+         await ns.ReadExactlyAsync(fullMsg, 4, msgLenAsInt - 4, ctsSource.Token);
+         Message bitFieldMsg = MessageFactory.MakeFromBytes(fullMsg);
+         BitField = bitFieldMsg.Payload ??
+                    throw new NullReferenceException(
+                       "Bitfield payload is null, therefore peer message parsed incorrectly");
+      }
+      catch (OperationCanceledException)
+      {
+         Console.WriteLine("Bitfield request timed out");
+         return false;
+      }
+      catch (Exception e)
+      {
+         Console.WriteLine($"Bitfield request failed: {e.Message} ({e.GetType()})");
+         return false;
+      }
+
+      return true;
    }
-   //public async Task<bool> AttemptFetchPiece(int piece)
+   
+   private void Dispose(bool disposing)
+   {
+      if (disposing)
+      {
+         Connection.Dispose();
+      }
+   }
+
+   public void Dispose()
+   {
+      Dispose(true);
+      GC.SuppressFinalize(this);
+   }
 }

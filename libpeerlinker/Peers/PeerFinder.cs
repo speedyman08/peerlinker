@@ -8,7 +8,7 @@ namespace libpeerlinker.Peers;
 public class PeerFinder
 {
     // Peers that have responded.
-    private readonly List<PeerIpv4> _knownGoodPeers = new();
+    private readonly List<PeerConn> _knownGoodPeers = new();
 
     private readonly byte[] _handshakeBytes;
     
@@ -38,32 +38,32 @@ public class PeerFinder
             for (int i = 0; i < numPeers; i += 20)
             {
                 // The lists of peers and their associated handshake task.
-                List<Task<bool>> handShakes = new();
+                List<Task<PeerConn?>> handshakeTasks = new();
                 List<PeerIpv4> peers = new();
 
                 Console.WriteLine($"-- Handshake Chunk({i}-{i + 20}) --");
                 for (int j = i; j < i + 20 && j < numPeers; j++)
                 {
-                    handShakes.Add(
-                        CheckConnection(trackerPeers[j])
+                    handshakeTasks.Add(
+                        HandshakeAsync(trackerPeers[j])
                     );
                     peers.Add(trackerPeers[j]);
                 }
 
                 Console.WriteLine($"-- Results({i}-{i + 20})--");
-                while (handShakes.Count > 0)
+                while (handshakeTasks.Count > 0)
                 {
-                    var task = await Task.WhenAny(handShakes);
-                    var idx = handShakes.IndexOf(task);
+                    var task = await Task.WhenAny(handshakeTasks);
+                    var idx = handshakeTasks.IndexOf(task);
 
-                    if (task.Result)
+                    if (task.Result is not null)
                     {
-                        _knownGoodPeers.Add(peers[idx]);
+                        _knownGoodPeers.Add(task.Result);
                         Console.WriteLine($"{peers[idx]} added to reachable peers");
                     }
 
                     peers.RemoveAt(idx);
-                    handShakes.RemoveAt(idx);
+                    handshakeTasks.RemoveAt(idx);
                 }
             }
         }
@@ -95,7 +95,7 @@ public class PeerFinder
             using var ioCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
             using var _ = ioCts.Token.Register(conn.Dispose);
 
-            using var netStream = conn.GetStream();
+            var netStream = conn.GetStream();
             byte[] response = new byte[68];
 
             await netStream.WriteAsync(_handshakeBytes, ioCts.Token);
@@ -117,7 +117,7 @@ public class PeerFinder
         }
         catch (EndOfStreamException)
         {
-            Console.WriteLine($"{peer} sent an EOF (peer active but not for this info hash)");
+            Console.WriteLine($"{peer} closed the connection before handshake");
             return null;
         }
         catch (OperationCanceledException)
@@ -135,11 +135,5 @@ public class PeerFinder
             Console.WriteLine($"{peer} unknown error");
             return null;
         }
-    }
-
-    private async Task<bool> CheckConnection(PeerIpv4 peer)
-    {
-        var peerConn = await HandshakeAsync(peer);
-        return peerConn is not null;
     }
 }

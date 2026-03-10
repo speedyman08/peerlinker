@@ -2,7 +2,6 @@
 using libpeerlinker.Messages;
 using libpeerlinker.Peers;
 using libpeerlinker.Tracking;
-using libpeerlinker.Messages;
 
 TorrentMetadata meta = TorrentMetadata.FromFile("debian.torrent");
 
@@ -33,6 +32,8 @@ if (discoveryResult.Status == DiscoveryStatus.NoPeers)
 {
     Console.WriteLine("No peers found. Are we cooked?");
 }
+
+Console.WriteLine("-- Piece Exchange --");
 
 var fetcher = new PieceFetcher(discoveryResult.RespondingPeers, handshake);
 
