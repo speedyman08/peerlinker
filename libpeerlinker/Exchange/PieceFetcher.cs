@@ -9,6 +9,7 @@ namespace libpeerlinker.Exchange;
 /// </summary>
 public class PieceFetcher
 {
+    public int BlockLength { get; set; } = 16000;
     private readonly List<PeerConn> _reachablePeers;
     private readonly PeerFinder _finder;
     private BindingList<PeerConn> ActiveConnections { get; } = [];
@@ -48,10 +49,50 @@ public class PieceFetcher
           // payload can't be null
           handle.BitField = res.Payload!;
           Console.WriteLine($"(PieceFetcher): Got bitfield for {handle.InitialHandshake}");
-          // send keepalivemsg
+          // send keepalive
           await handle.SendKeepAlive();
           Console.WriteLine($"(PieceFetcher): Sent keepalive to {handle.InitialHandshake}, OnConnect is DONE");
        }
+    }
+
+    async Task MainLoop()
+    {
+       var handle = ActiveConnections[Random.Shared.Next(ActiveConnections.Count)];
+       
+       // try get the first block for now;
+       
+       Console.WriteLine($"Attempting first piece");
+       var interestMsg = MessageFactory.MakeInterested();
+       await handle.SendMessage(interestMsg);
+
+       // while (handle.Connection.Available > 0)
+       // {
+       //    // we have stray messages we don't actually care about
+       //    var resStray = await handle.RecvMessage();
+       //    if (resStray is null)
+       //    {
+       //       Console.WriteLine($"No message even though we have data available, {handle.InitialHandshake}");
+       //       return;
+       //    }
+       //    
+       //    Console.WriteLine($"(PieceFetcher): Got stray message from {handle.InitialHandshake}");
+       //
+       //    if (resStray.Header.messageID != MessageType.Choke) continue;
+       //    Console.WriteLine($"(PieceFetcher): Got choke from {handle.InitialHandshake}");
+       //    Console.WriteLine("I'm giving up");
+       //       
+       //    KillPeer(handle);
+       //    return;
+       // }
+       
+       var res = await handle.GetBlock(0, 0, BlockLength);
+       if (res is null)
+       {
+          Console.WriteLine($"(PieceFetcher): Failed to get block from {handle.InitialHandshake}");
+          return;
+       }
+       
+       Console.WriteLine($"Raw Data: {Convert.ToHexString(res)}");
     }
 
     void KillPeer(PeerConn conn)
@@ -62,5 +103,6 @@ public class PieceFetcher
     public async Task Start()
     {
        await StartPopulatingConns();
+       await MainLoop();
     }
 }

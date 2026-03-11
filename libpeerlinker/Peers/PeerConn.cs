@@ -16,6 +16,9 @@ public class PeerConn : IDisposable
    public int Priority { get; set; } = 5;
 
    public TcpClient Connection { get; init; }
+   private NetworkStream Ns { get;  }
+   
+   
    public Handshake? InitialHandshake { get; set; }
    
    // Initially both are choked and no interest
@@ -30,6 +33,7 @@ public class PeerConn : IDisposable
       if (!conn.Connected) throw new ArgumentException("(PeerConn) The TCP Client provided isn't connected to anything yet");
 
       Connection = conn;
+      Ns = Connection.GetStream();
    }
    ~PeerConn()
    {
@@ -41,29 +45,41 @@ public class PeerConn : IDisposable
       try
       {
          var ctsSource = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-
-         var ns = Connection.GetStream();
          var msgLenBytes = new byte[4];
-         await ns.ReadExactlyAsync(msgLenBytes, 0, 4, ctsSource.Token);
+         await Ns.ReadExactlyAsync(msgLenBytes, 0, 4, ctsSource.Token);
          var msgLenAsInt = BinaryPrimitives.ReadInt32BigEndian(msgLenBytes);
 
-         var fullMsg = new byte[msgLenAsInt];
+         var fullMsg = new byte[msgLenAsInt + 4];
          msgLenBytes.CopyTo(fullMsg, 0);
 
-         await ns.ReadExactlyAsync(fullMsg, 4, msgLenAsInt - 4, ctsSource.Token);
-         
+         await Ns.ReadExactlyAsync(fullMsg, 4, msgLenAsInt, ctsSource.Token);
+
          var msgObj = MessageFactory.MakeFromBytes(fullMsg);
+
+         if (msgObj.Header.messageID == MessageType.Choke)
+         {
+            MeChoked = true;
+         }
+         else if (msgObj.Header.messageID == MessageType.Unchoke)
+         {
+            MeChoked = false;
+         }
 
          return msgObj;
       }
       catch (OperationCanceledException)
       {
-         Console.WriteLine("Bitfield request timed out");
+         Console.WriteLine($"Recv timed out, {InitialHandshake}");
+         return null;
+      }
+      catch (EndOfStreamException)
+      {
+         Console.WriteLine($"Connection closed by peer, {InitialHandshake}");
          return null;
       }
       catch (Exception e)
       {
-         Console.WriteLine($"Bitfield request failed: {e.Message} ({e.GetType()})");
+         Console.WriteLine($"Recv failed: {e.Message} ({e.GetType()}), {InitialHandshake}");
          return null;
       }
    }
@@ -74,9 +90,8 @@ public class PeerConn : IDisposable
       {
          var ctsSource = new CancellationTokenSource(TimeSpan.FromSeconds(5));
 
-         var ns = Connection.GetStream();
          var msgBytes = msg.EncodeAsBytes();
-         await ns.WriteAsync(msgBytes, 0, msgBytes.Length, ctsSource.Token);
+         await Ns.WriteAsync(msgBytes, 0, msgBytes.Length, ctsSource.Token);
          return true;
       }
       catch (OperationCanceledException)
@@ -97,6 +112,30 @@ public class PeerConn : IDisposable
       
       return await SendMessage(msg);
    }
+   
+   public async Task<byte[]?> GetBlock(int pieceIdx, int blockOffset, int blockLength)
+   {
+      var msg = MessageFactory.MakeRequest(pieceIdx, blockOffset, blockLength);
+      await SendMessage(msg);
+      while (true)
+      {
+         var res = await RecvMessage();
+         if (res is null)
+            return null;
+
+         if (res.Header.messageID == MessageType.Piece)
+            return res.Payload;
+
+         if (res.Header.messageID == MessageType.Choke)
+         {
+            Console.WriteLine("(GetBlock): Choke received, it's over");
+            return null;
+         }
+         
+         Console.WriteLine($"(GetBlock): Skipping {res.Header.messageID} while waiting for Piece");
+      }
+   }
+   
    private void Dispose(bool disposing)
    {
       if (disposing)
