@@ -36,7 +36,7 @@ public class PeerConn : IDisposable
       Dispose(false);
    }
 
-   public async Task<bool> GetBitField()
+   public async Task<Message?> RecvMessage()
    {
       try
       {
@@ -47,35 +47,56 @@ public class PeerConn : IDisposable
          await ns.ReadExactlyAsync(msgLenBytes, 0, 4, ctsSource.Token);
          var msgLenAsInt = BinaryPrimitives.ReadInt32BigEndian(msgLenBytes);
 
-         if (msgLenAsInt == 0)
-         {
-            Console.WriteLine("Got a keepalive, ignoring for now im only checking bitfields");
-            return false;
-         }
-
          var fullMsg = new byte[msgLenAsInt];
          msgLenBytes.CopyTo(fullMsg, 0);
-         
+
          await ns.ReadExactlyAsync(fullMsg, 4, msgLenAsInt - 4, ctsSource.Token);
-         Message bitFieldMsg = MessageFactory.MakeFromBytes(fullMsg);
-         BitField = bitFieldMsg.Payload ??
-                    throw new NullReferenceException(
-                       "Bitfield payload is null, therefore peer message parsed incorrectly");
+         
+         var msgObj = MessageFactory.MakeFromBytes(fullMsg);
+
+         return msgObj;
       }
       catch (OperationCanceledException)
       {
          Console.WriteLine("Bitfield request timed out");
-         return false;
+         return null;
       }
       catch (Exception e)
       {
          Console.WriteLine($"Bitfield request failed: {e.Message} ({e.GetType()})");
+         return null;
+      }
+   }
+
+   public async Task<bool> SendMessage(Message msg)
+   {
+      try
+      {
+         var ctsSource = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+
+         var ns = Connection.GetStream();
+         var msgBytes = msg.EncodeAsBytes();
+         await ns.WriteAsync(msgBytes, 0, msgBytes.Length, ctsSource.Token);
+         return true;
+      }
+      catch (OperationCanceledException)
+      {
+         Console.WriteLine($"Message timed out ({msg.Header.messageID}) for {InitialHandshake}");
          return false;
       }
-
-      return true;
+      catch (Exception e)
+      {
+         Console.WriteLine($"Failed to send message: {e.Message} ({e.GetType()})");
+         return false;
+      }
    }
-   
+
+   public async Task<bool> SendKeepAlive()
+   {
+      var msg = MessageFactory.MakeKeepAlive();
+      
+      return await SendMessage(msg);
+   }
    private void Dispose(bool disposing)
    {
       if (disposing)

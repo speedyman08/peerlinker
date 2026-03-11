@@ -36,15 +36,21 @@ public class PieceFetcher
        if (e.ListChangedType == ListChangedType.ItemAdded)
        {
           var handle = ActiveConnections[e.NewIndex];
-          var res = await handle.GetBitField();
-          if (!res)
+          var res = await handle.RecvMessage();
+          
+          if (res is null || res.Header.messageID != MessageType.Bitfield)
           {
-             Console.WriteLine($"(PieceFetcher): failed to get bitfield for {handle.InitialHandshake}");
+             Console.WriteLine($"(PieceFetcher): didnt get bitfield for {handle.InitialHandshake}");
              KillPeer(handle);
              return;
           }
-          
+
+          // payload can't be null
+          handle.BitField = res.Payload!;
           Console.WriteLine($"(PieceFetcher): Got bitfield for {handle.InitialHandshake}");
+          // send keepalivemsg
+          await handle.SendKeepAlive();
+          Console.WriteLine($"(PieceFetcher): Sent keepalive to {handle.InitialHandshake}, OnConnect is DONE");
        }
     }
 
