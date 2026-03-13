@@ -49,11 +49,13 @@ public unsafe struct Handshake
     {
         fixed (byte* p = clientIdentifier)
         {
-            string id = Encoding.ASCII.GetString(p, 20);
-            return $"Handshake {{ Identifier: {id} }}";
+            return Encoding.ASCII.GetString(p, 20);
         }
     }
 
 
-    public Handshake(TorrentMetadata meta, string identifier) : this(meta.InfoDictSha1, identifier) {}
+    public Handshake(TorrentMetadata meta, string identifier) : this(meta.InfoDictSha1, identifier)
+    {
+        
+    }
 }

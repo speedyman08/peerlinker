@@ -11,7 +11,8 @@ public class PeerFinder
     private readonly List<PeerConn> _knownGoodPeers = new();
 
     private readonly byte[] _handshakeBytes;
-    
+
+    private Handshake _handshake;
     
     private byte[] MarshalHandshakeAsBytes(Handshake handshake)
     {
@@ -23,14 +24,15 @@ public class PeerFinder
     
     public PeerFinder(Handshake handshake)
     {
+        _handshake = handshake;
         _handshakeBytes = MarshalHandshakeAsBytes(handshake);
     }
     
-    public async Task<DiscoveryResult> DiscoveryAsync(List<PeerIpv4> trackerPeers, Handshake handshake)
+    public async Task<DiscoveryResult> DiscoveryAsync(List<PeerIpv4> trackerPeers)
     {
         try
         {
-            Console.WriteLine($"Using handshake {Convert.ToHexString(_handshakeBytes)}");
+            Console.WriteLine($"Using handshake {_handshake}");
             // Handshake our peers given from the tracker in chunks of 20
             // store them in the known good peers list if they respond
 
@@ -103,10 +105,7 @@ public class PeerFinder
 
             Handshake responseHandshake = Handshake.FromBytes(response);
             
-            PeerConn peerConn = new(conn)
-            {
-                Handshake = responseHandshake,
-            };
+            PeerConn peerConn = new(conn, responseHandshake);
 
             return peerConn;
         }

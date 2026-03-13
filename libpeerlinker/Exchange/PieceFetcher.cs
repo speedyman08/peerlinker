@@ -64,31 +64,11 @@ public class PieceFetcher
     {
        var handle = ActiveConnections[Random.Shared.Next(ActiveConnections.Count)];
        
-       // try get the first block for now;
+       // try get the first block for now
        
        Console.WriteLine($"Attempting first piece");
        var interestMsg = MessageFactory.MakeInterested();
        await handle.SendMessage(interestMsg);
-
-       // while (handle.Connection.Available > 0)
-       // {
-       //    // we have stray messages we don't actually care about
-       //    var resStray = await handle.RecvMessage();
-       //    if (resStray is null)
-       //    {
-       //       Console.WriteLine($"No message even though we have data available, {handle.InitialHandshake}");
-       //       return;
-       //    }
-       //    
-       //    Console.WriteLine($"(PieceFetcher): Got stray message from {handle.InitialHandshake}");
-       //
-       //    if (resStray.Header.messageID != MessageType.Choke) continue;
-       //    Console.WriteLine($"(PieceFetcher): Got choke from {handle.InitialHandshake}");
-       //    Console.WriteLine("I'm giving up");
-       //       
-       //    KillPeer(handle);
-       //    return;
-       // }
        
        var res = await handle.GetBlock(0, 0, BlockLength);
        if (res is null)

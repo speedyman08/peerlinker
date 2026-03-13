@@ -26,7 +26,7 @@ var handshake = new Handshake(meta, tracker.Identifier);
 
 PeerFinder finder = new(handshake);
 
-var discoveryResult = await finder.DiscoveryAsync(res.TrackerPeers, handshake);
+var discoveryResult = await finder.DiscoveryAsync(res.TrackerPeers);
 
 if (discoveryResult.Status == DiscoveryStatus.NoPeers)
 {

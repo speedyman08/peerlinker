@@ -12,8 +12,9 @@ public class MessageDispatcher(Channel<Message> input)
     public Channel<Message> HaveMessages { get; } = Channel.CreateUnbounded<Message>();
     public Channel<Message> BitfieldMessages { get; } = Channel.CreateUnbounded<Message>();
 
+    
     public async Task RunAsync(CancellationToken ct = default)
-    {
+     {
         await foreach (var msg in input.Reader.ReadAllAsync(ct))
         {
             var target = msg.Header.messageID switch

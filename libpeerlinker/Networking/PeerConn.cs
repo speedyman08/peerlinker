@@ -28,15 +28,16 @@ public class PeerConn : IDisposable
    public byte[] BitField { get; set; } = [];
 
    // Don't use this constructor directly, you can get a PeerConn object from the PeerFinder.Handshake method
-   public PeerConn(TcpClient conn)
+   public PeerConn(TcpClient conn, Handshake handshake)
    {
       if (!conn.Connected) throw new ArgumentException("(PeerConn) The TCP Client provided isn't connected to anything yet");
 
       Connection = conn;
       Ns = Connection.GetStream();
+      Handshake = handshake;
 
       var mainChannel = Channel.CreateUnbounded<Message>();
-      _ = new MessageReceiver(Ns, mainChannel, Handshake.ToString() ?? "").MessageLoop();
+      _ = new MessageReceiver(Ns, mainChannel, handshake).MessageLoop();
       
       Messages = new MessageDispatcher(mainChannel);
       _ = Messages.RunAsync();
