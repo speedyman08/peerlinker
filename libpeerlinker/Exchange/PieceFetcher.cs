@@ -28,7 +28,7 @@ public class PieceFetcher
           return;
        
        var chosenPeers = _reachablePeers.Shuffle().Take(_reachablePeers.Count / 2).ToList();
-       chosenPeers.ForEach(i => Console.WriteLine($"Considering {i.InitialHandshake} as first candidate"));
+       chosenPeers.ForEach(i => Console.WriteLine($"Considering {i.Handshake} as first candidate"));
        chosenPeers.ForEach(i => ActiveConnections.Add(i));
     }
 
@@ -37,21 +37,26 @@ public class PieceFetcher
        if (e.ListChangedType == ListChangedType.ItemAdded)
        {
           var handle = ActiveConnections[e.NewIndex];
-          var res = await handle.RecvMessage();
+          var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
+
+          Message res;
           
-          if (res is null || res.Header.messageID != MessageType.Bitfield)
+          try {
+             res = await handle.Messages.BitfieldMessages.Reader.ReadAsync(cts.Token);
+          }
+          catch (OperationCanceledException)
           {
-             Console.WriteLine($"(PieceFetcher): didnt get bitfield for {handle.InitialHandshake}");
+             Console.WriteLine($"(PieceFetcher): Never got a bitfield from {handle.Handshake}");
              KillPeer(handle);
              return;
           }
-
+          
           // payload can't be null
           handle.BitField = res.Payload!;
-          Console.WriteLine($"(PieceFetcher): Got bitfield for {handle.InitialHandshake}");
+          Console.WriteLine($"(PieceFetcher): Got bitfield for {handle.Handshake}");
           // send keepalive
           await handle.SendKeepAlive();
-          Console.WriteLine($"(PieceFetcher): Sent keepalive to {handle.InitialHandshake}, OnConnect is DONE");
+          Console.WriteLine($"(PieceFetcher): Sent keepalive to {handle.Handshake}, OnConnect is DONE");
        }
     }
 
@@ -88,7 +93,7 @@ public class PieceFetcher
        var res = await handle.GetBlock(0, 0, BlockLength);
        if (res is null)
        {
-          Console.WriteLine($"(PieceFetcher): Failed to get block from {handle.InitialHandshake}");
+          Console.WriteLine($"(PieceFetcher): Failed to get block from {handle.Handshake}");
           return;
        }
        

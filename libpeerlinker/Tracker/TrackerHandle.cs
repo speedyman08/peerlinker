@@ -13,7 +13,7 @@ namespace libpeerlinker.Tracking;
 /// <summary>
 /// A class which represents a tracker, currently allows for initialisation only with the <c>Announce()</c> method.
 /// </summary>
-public class TrackerHandle
+public class Tracker
 {
     private HttpClient m_httpClient;
 
@@ -40,7 +40,7 @@ public class TrackerHandle
     /// <param name="clientVer">A version to report to the tracker and other peers.</param>
     /// <param name="meta">Object describing metadata. Needed for info dictionary hash computation</param>
     
-    public TrackerHandle(TorrentMetadata meta, Version clientVer)
+    public Tracker(TorrentMetadata meta, Version clientVer)
     {
         ValidateVersion(clientVer);
         m_ver = clientVer;

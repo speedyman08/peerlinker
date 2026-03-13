@@ -17,7 +17,7 @@ var msg = MessageFactory.MakeFromBytes(msgRawBytes);
 
 Console.WriteLine($"Tracker {meta.TrackerUrl}");
 
-var tracker = new TrackerHandle(meta, new Version(0, 0, 1));
+var tracker = new Tracker(meta, new Version(0, 0, 1));
 
 var res = await tracker.Announce();
 

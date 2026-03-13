@@ -105,7 +105,7 @@ public class PeerFinder
             
             PeerConn peerConn = new(conn)
             {
-                InitialHandshake = responseHandshake,
+                Handshake = responseHandshake,
             };
 
             return peerConn;
