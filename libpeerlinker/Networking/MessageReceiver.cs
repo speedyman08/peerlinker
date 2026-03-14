@@ -5,7 +5,7 @@ using libpeerlinker.Messages;
 
 namespace libpeerlinker.Peers;
 
-public class MessageReceiver(NetworkStream ns, Channel<Message> output, Handshake handshake)
+public class MessageReceiver(NetworkStream ns, Channel<Message> output)
 {
     private readonly CancellationTokenSource _timerSource = new(TimeSpan.FromMinutes(2));
 
@@ -26,11 +26,8 @@ public class MessageReceiver(NetworkStream ns, Channel<Message> output, Handshak
 
             if (msgObj.Header.messageID == MessageType.KeepAlive)
             {
-                Console.WriteLine("Received keepalive message");
                 _timerSource.TryReset();
             }
-            
-            Console.WriteLine($"{handshake}: {msgObj.Header.messageID}");
             
             return msgObj;
         }
@@ -51,7 +48,6 @@ public class MessageReceiver(NetworkStream ns, Channel<Message> output, Handshak
             var msg = await Recv();
             if (msg is null)
             {
-                Console.WriteLine($"{handshake} Connection lost or timed out");
                 break;
             }
 

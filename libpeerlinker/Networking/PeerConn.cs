@@ -37,7 +37,7 @@ public class PeerConn : IDisposable
       Handshake = handshake;
 
       var mainChannel = Channel.CreateUnbounded<Message>();
-      _ = new MessageReceiver(Ns, mainChannel, handshake).MessageLoop();
+      _ = new MessageReceiver(Ns, mainChannel).MessageLoop();
       
       Messages = new MessageDispatcher(mainChannel);
       _ = Messages.RunAsync();
@@ -72,17 +72,14 @@ public class PeerConn : IDisposable
    //    }
    //    catch (OperationCanceledException)
    //    {
-   //       Console.WriteLine($"Recv timed out, {InitialHandshake}");
    //       return null;
    //    }
    //    catch (EndOfStreamException)
    //    {
-   //       Console.WriteLine($"Connection closed by peer, {InitialHandshake}");
    //       return null;
    //    }
    //    catch (Exception e)
    //    {
-   //       Console.WriteLine($"Recv failed: {e.Message} ({e.GetType()}), {InitialHandshake}");
    //       return null;
    //    }
    // }
@@ -99,12 +96,10 @@ public class PeerConn : IDisposable
       }
       catch (OperationCanceledException)
       {
-         Console.WriteLine($"Message timed out ({msg.Header.messageID}) for {Handshake}");
          return false;
       }
-      catch (Exception e)
+      catch (Exception)
       {
-         Console.WriteLine($"Failed to send message: {e.Message} ({e.GetType()})");
          return false;
       }
    }

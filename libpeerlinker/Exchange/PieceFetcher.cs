@@ -28,7 +28,6 @@ public class PieceFetcher
           return;
        
        var chosenPeers = _reachablePeers.Shuffle().Take(_reachablePeers.Count / 2).ToList();
-       chosenPeers.ForEach(i => Console.WriteLine($"Considering {i.Handshake} as first candidate"));
        chosenPeers.ForEach(i => ActiveConnections.Add(i));
     }
 
@@ -46,17 +45,14 @@ public class PieceFetcher
           }
           catch (OperationCanceledException)
           {
-             Console.WriteLine($"(PieceFetcher): Never got a bitfield from {handle.Handshake}");
              KillPeer(handle);
              return;
           }
           
           // payload can't be null
           handle.BitField = res.Payload!;
-          Console.WriteLine($"(PieceFetcher): Got bitfield for {handle.Handshake}");
           // send keepalive
           await handle.SendKeepAlive();
-          Console.WriteLine($"(PieceFetcher): Sent keepalive to {handle.Handshake}, OnConnect is DONE");
        }
     }
 
@@ -66,18 +62,14 @@ public class PieceFetcher
        
        // try get the first block for now
        
-       Console.WriteLine($"Attempting first piece");
        var interestMsg = MessageFactory.MakeInterested();
        await handle.SendMessage(interestMsg);
        
        var res = await handle.GetBlock(0, 0, BlockLength);
        if (res is null)
        {
-          Console.WriteLine($"(PieceFetcher): Failed to get block from {handle.Handshake}");
           return;
        }
-       
-       Console.WriteLine($"Raw Data: {Convert.ToHexString(res)}");
     }
 
     void KillPeer(PeerConn conn)

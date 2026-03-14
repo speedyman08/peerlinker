@@ -48,12 +48,6 @@ public class TorrentMetadata
             throw new FileLoadException($"{filepath} inaccessible");
         }
         
-        #if DEBUG
-        Console.WriteLine($"-- {filepath} --");
-        PrettyPrint.DebugDict(benDict);
-        
-        #endif
-
         BString announceString;
         try
         {

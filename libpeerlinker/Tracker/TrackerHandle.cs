@@ -147,8 +147,6 @@ public class Tracker
             DangerousDisablePathAndQueryCanonicalization = true
         });
 
-        Console.WriteLine($"Full URI: {fullUri}");
-
         HttpRequestMessage announceReq = new(HttpMethod.Get, fullUri);
 
         BDictionary responseDict;
@@ -174,7 +172,6 @@ public class Tracker
         }
         catch (TaskCanceledException ex)
         {
-            Console.WriteLine($"Tracker {m_torrent.TrackerUrl}timed out.");
             throw new TrackerException($"Timed out: {ex.Message}");
         }
 
@@ -183,17 +180,11 @@ public class Tracker
                                                                   entry.Key != "peers"
                                                                && entry.Key != "peers6"));
 
-        Console.WriteLine("-- Response Dump --");
         PrettyPrint.DebugDict(dump);
 #endif
         var peers = ParsePeerList(responseDict);
 
 #if DEBUG
-        Console.WriteLine("-- Peer List --");
-        foreach (var peerIpv4 in peers)
-        {
-            Console.WriteLine(peerIpv4);
-        }
 #endif
 
         // Sometimes, trackers will only send the interval and the compact peer list.

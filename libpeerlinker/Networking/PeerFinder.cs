@@ -32,7 +32,6 @@ public class PeerFinder
     {
         try
         {
-            Console.WriteLine($"Using handshake {_handshake}");
             // Handshake our peers given from the tracker in chunks of 20
             // store them in the known good peers list if they respond
 
@@ -43,7 +42,6 @@ public class PeerFinder
                 List<Task<PeerConn?>> handshakeTasks = new();
                 List<PeerIpv4> peers = new();
 
-                Console.WriteLine($"-- Handshake Chunk({i}-{i + 20}) --");
                 for (int j = i; j < i + 20 && j < numPeers; j++)
                 {
                     handshakeTasks.Add(
@@ -52,7 +50,6 @@ public class PeerFinder
                     peers.Add(trackerPeers[j]);
                 }
 
-                Console.WriteLine($"-- Results({i}-{i + 20})--");
                 while (handshakeTasks.Count > 0)
                 {
                     var task = await Task.WhenAny(handshakeTasks);
@@ -61,7 +58,6 @@ public class PeerFinder
                     if (task.Result is not null)
                     {
                         _knownGoodPeers.Add(task.Result);
-                        Console.WriteLine($"{peers[idx]} added to reachable peers");
                     }
 
                     peers.RemoveAt(idx);
@@ -69,10 +65,8 @@ public class PeerFinder
                 }
             }
         }
-        catch (TrackerException e)
+        catch (TrackerException)
         {
-            Console.WriteLine("Did not get a successful announce");
-            Console.WriteLine(e.Message);
         }
 
         return _knownGoodPeers.Count == 0
@@ -111,27 +105,22 @@ public class PeerFinder
         }
         catch (SocketException)
         {
-            Console.WriteLine($"{peer} refused the connection");
             return null;
         }
         catch (EndOfStreamException)
         {
-            Console.WriteLine($"{peer} closed the connection before handshake");
             return null;
         }
         catch (OperationCanceledException)
         {
-            Console.WriteLine($"{peer} timed out / IO too long");
             return null;
         }
         catch (IOException)
         {
-            Console.WriteLine($"{peer} IO error");
             return null;
         }
         catch
         {
-            Console.WriteLine($"{peer} unknown error");
             return null;
         }
     }
