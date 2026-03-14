@@ -9,21 +9,33 @@ public class MessageDispatcher(Channel<Message> input)
     public Channel<Message> PieceMessages { get; } = Channel.CreateUnbounded<Message>();
     public Channel<Message> ChokeMessages { get; } = Channel.CreateUnbounded<Message>();
     public Channel<Message> UnchokeMessages { get; } = Channel.CreateUnbounded<Message>();
+    public Channel<Message> InterestedMessages { get; } = Channel.CreateUnbounded<Message>();
+    public Channel<Message> NotInterestedMessages { get; } = Channel.CreateUnbounded<Message>();
     public Channel<Message> HaveMessages { get; } = Channel.CreateUnbounded<Message>();
     public Channel<Message> BitfieldMessages { get; } = Channel.CreateUnbounded<Message>();
+    public Channel<Message> RequestMessages { get; } = Channel.CreateUnbounded<Message>();
+    public Channel<Message> CancelMessages { get; } = Channel.CreateUnbounded<Message>();
+    public Channel<Message> PortMessages { get; } = Channel.CreateUnbounded<Message>();
+    public Channel<Message> KeepAliveMessages { get; } = Channel.CreateUnbounded<Message>();
 
     
     public async Task RunAsync(CancellationToken ct = default)
      {
         await foreach (var msg in input.Reader.ReadAllAsync(ct))
         {
-            var target = msg.Header.messageID switch
+            var target = msg.GetMsgType() switch
             {
-                MessageType.Piece   => PieceMessages,
-                MessageType.Choke   => ChokeMessages,
+                MessageType.Piece => PieceMessages,
+                MessageType.Choke => ChokeMessages,
                 MessageType.Unchoke => UnchokeMessages,
-                MessageType.Have    => HaveMessages,
+                MessageType.Interested => InterestedMessages,
+                MessageType.NotInterested => NotInterestedMessages,
+                MessageType.Have => HaveMessages,
                 MessageType.Bitfield => BitfieldMessages,
+                MessageType.Request => RequestMessages,
+                MessageType.Cancel => CancelMessages,
+                MessageType.Port => PortMessages,
+                MessageType.KeepAlive => KeepAliveMessages,
                 _ => null
             };
 
@@ -34,7 +46,13 @@ public class MessageDispatcher(Channel<Message> input)
         PieceMessages.Writer.Complete();
         ChokeMessages.Writer.Complete();
         UnchokeMessages.Writer.Complete();
+        InterestedMessages.Writer.Complete();
+        NotInterestedMessages.Writer.Complete();
         HaveMessages.Writer.Complete();
         BitfieldMessages.Writer.Complete();
+        RequestMessages.Writer.Complete();
+        CancelMessages.Writer.Complete();
+        PortMessages.Writer.Complete();
+        KeepAliveMessages.Writer.Complete();
     }
 }
