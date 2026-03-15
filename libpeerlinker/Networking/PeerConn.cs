@@ -26,8 +26,8 @@ public class PeerConn : IDisposable
    // Initially both are choked and no interest
    public bool MeChoked { get; set; } = true;
    public bool PeerChoked { get; set; } = true;
-   public bool MeInterest { get; set; } = false;
-   public bool PeerInterest { get; set; } = false;
+   public bool MeInterest { get; set; } 
+   public bool PeerInterest { get; set; }
    public byte[] BitField { get; set; } = [];
 
    // Don't use this constructor directly, you can get a PeerConn object from the PeerFinder.Handshake method
@@ -75,27 +75,21 @@ public class PeerConn : IDisposable
    
    public async Task<byte[]?> GetBlock(int pieceIdx, int blockOffset, int blockLength)
    {
+      if (MeChoked)
+      {
+         Logger.Instance.Verbose("Peer {peer} choked us, we can't request. GetBlock aborted", Handshake);
+         return null;
+      }
       var msg = MessageFactory.MakeRequest(pieceIdx, blockOffset, blockLength);
       await SendMessage(msg);
 
       var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-
-      try
-      {
-         var firstPiece = await Messages.PieceMessages.Reader.ReadAsync(cts.Token);
-
-         return firstPiece.Payload;
-      }
-      catch (OperationCanceledException)
-      {
-         Logger.Instance.Verbose("Timed out waiting for block from peer {peer}", Handshake);
-         return null;
-      }
-      catch (ChannelClosedException) // this may happen if the network stream received EOF, where then the dispatcher closes all channels
-      {
-         Logger.Instance.Verbose("Peer {peer} closed channel before piece message", Handshake);
-         return null;
-      }
+      
+      var pieceMsg = await Messages.BlockUntilRead(MessageType.Piece, cts.Token);
+      if (pieceMsg is not null) return pieceMsg.Payload;
+      
+      Logger.Instance.Debug("Did not receive block (piece index {pieceIdx}, block offset {blockOffset} from {peer}",pieceIdx, blockOffset, Handshake);
+      return null;
    }
    
    private void Dispose(bool disposing)

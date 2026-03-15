@@ -42,9 +42,14 @@ public class MessageReceiver(NetworkStream ns, Channel<Message> output, Handshak
             Logger.Instance.Debug("Peer {identifier} disconnected :(", handshake);
             return null;
         }
+        catch (IOException)
+        {
+            Logger.Instance.Debug("Stream closed for {identifier} (disposed locally)", handshake);
+            return null;
+        }
         catch(Exception e)
         {
-            Logger.Instance.Debug("Unknown error occured while receiving message: {error}", e.Message);
+            Logger.Instance.Debug("Unknown error occured while receiving message: {error}, type {type}", e.Message, e.GetType());
             return null;
         }
     }

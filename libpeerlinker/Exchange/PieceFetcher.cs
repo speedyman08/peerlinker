@@ -40,19 +40,10 @@ public class PieceFetcher
           Logger.Instance.Information("Using peer connection {peer}", handle.Handshake);
           var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
-          Message res;
-
-          try
+          var res = await handle.Messages.BlockUntilRead(MessageType.Bitfield, cts.Token);
+          if (res is null)
           {
-             res = await handle.Messages.BitfieldMessages.Reader.ReadAsync(cts.Token);
-          }
-          catch (OperationCanceledException)
-          {
-             KillPeer(handle);
-             return;
-          }
-          catch (ChannelClosedException)
-          {
+             Logger.Instance.Fatal("Did not get bitfield from peer {peer}", handle.Handshake);
              KillPeer(handle);
              return;
           }
@@ -77,18 +68,16 @@ public class PieceFetcher
        Logger.Instance.Information("Sent interested message to peer {peer}", handle.Handshake);
       
        // we need to wait for the unchoke message
-       try
+       var unchokeToken = new CancellationTokenSource(TimeSpan.FromSeconds(2)).Token;
+       var unchokeMsg = await handle.Messages.BlockUntilRead(MessageType.Unchoke, unchokeToken);
+       if (unchokeMsg is null)
        {
-          var unchokeToken = new CancellationTokenSource(TimeSpan.FromSeconds(2)).Token;
-          Logger.Instance.Information("Waiting for unchoke message from peer {peer}", handle.Handshake);
-          await handle.Messages.UnchokeMessages.Reader.WaitToReadAsync(unchokeToken);
-       }
-       catch (OperationCanceledException)
-       {
-          Logger.Instance.Fatal("{peer} never unchoked us", handle.Handshake);
+          Logger.Instance.Fatal("peer {peer} did not unchoke us in time", handle.Handshake);
           KillPeer(handle);
           return;
        }
+       handle.MeChoked = false;
+       
        Logger.Instance.Information("Peer {peer} unchoked us", handle.Handshake);
        
        var res = await handle.GetBlock(0, 0, BlockLength);

@@ -11,7 +11,7 @@ using libpeerlinker.Utility;
 namespace libpeerlinker.Tracking;
 
 /// <summary>
-/// A class which represents a tracker, currently allows for initialisation only with the <c>Announce()</c> method.
+/// A class which represents a tracker
 /// </summary>
 public class Tracker
 {

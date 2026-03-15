@@ -19,32 +19,38 @@ public class MessageDispatcher(Channel<Message> input, Handshake handshake)
     public Channel<Message> PortMessages { get; } = Channel.CreateUnbounded<Message>();
     public Channel<Message> KeepAliveMessages { get; } = Channel.CreateUnbounded<Message>();
 
-    
+
+    private Channel<Message>? FetchChannel(MessageType type)
+    {
+        return type switch
+        {
+            MessageType.Piece => PieceMessages,
+            MessageType.Choke => ChokeMessages,
+            MessageType.Unchoke => UnchokeMessages,
+            MessageType.Interested => InterestedMessages,
+            MessageType.NotInterested => NotInterestedMessages,
+            MessageType.Have => HaveMessages,
+            MessageType.Bitfield => BitfieldMessages,
+            MessageType.Request => RequestMessages,
+            MessageType.Cancel => CancelMessages,
+            MessageType.Port => PortMessages,
+            MessageType.KeepAlive => KeepAliveMessages,
+            _ => null
+        };
+    }
     public async Task RunAsync()
-     {
+    {
         await foreach (var msg in input.Reader.ReadAllAsync())
         {
             Logger.Instance.Verbose("Received {type} from {handshake}", msg.GetMsgType(), handshake);
-            var target = msg.GetMsgType() switch
-            {
-                MessageType.Piece => PieceMessages,
-                MessageType.Choke => ChokeMessages,
-                MessageType.Unchoke => UnchokeMessages,
-                MessageType.Interested => InterestedMessages,
-                MessageType.NotInterested => NotInterestedMessages,
-                MessageType.Have => HaveMessages,
-                MessageType.Bitfield => BitfieldMessages,
-                MessageType.Request => RequestMessages,
-                MessageType.Cancel => CancelMessages,
-                MessageType.Port => PortMessages,
-                MessageType.KeepAlive => KeepAliveMessages,
-                _ => null
-            };
+            var target = FetchChannel(msg.GetMsgType());
 
             if (target is not null)
                 await target.Writer.WriteAsync(msg);
         }
 
+        Logger.Instance.Debug("Message channel closed for {peer}", handshake);
+        
         PieceMessages.Writer.Complete();
         ChokeMessages.Writer.Complete();
         UnchokeMessages.Writer.Complete();
@@ -56,5 +62,27 @@ public class MessageDispatcher(Channel<Message> input, Handshake handshake)
         CancelMessages.Writer.Complete();
         PortMessages.Writer.Complete();
         KeepAliveMessages.Writer.Complete();
+    }
+
+    public async Task<Message?> BlockUntilRead(MessageType type, CancellationToken token = default)
+    {
+        try
+        {
+            var channel = FetchChannel(type);
+            if (channel is not null) 
+                return await channel.Reader.ReadAsync(token);
+        }
+        catch (OperationCanceledException)
+        {
+            Logger.Instance.Verbose("Token expired before {type} read", type);
+            return null;
+        }
+        catch (ChannelClosedException)
+        {
+            Logger.Instance.Verbose("Channel is closed before {type} read (so we received a null recv in MessageReceiver)", type);
+            return null;
+        }
+
+        return null;
     }
 }
