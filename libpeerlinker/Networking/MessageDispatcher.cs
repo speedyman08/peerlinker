@@ -1,9 +1,10 @@
 using System.Threading.Channels;
 using libpeerlinker.Messages;
+using libpeerlinker.Utility;
 
 namespace libpeerlinker.Peers;
 
-public class MessageDispatcher(Channel<Message> input)
+public class MessageDispatcher(Channel<Message> input, Handshake handshake)
 {
     // specific channels for each message type
     public Channel<Message> PieceMessages { get; } = Channel.CreateUnbounded<Message>();
@@ -19,10 +20,11 @@ public class MessageDispatcher(Channel<Message> input)
     public Channel<Message> KeepAliveMessages { get; } = Channel.CreateUnbounded<Message>();
 
     
-    public async Task RunAsync(CancellationToken ct = default)
+    public async Task RunAsync()
      {
-        await foreach (var msg in input.Reader.ReadAllAsync(ct))
+        await foreach (var msg in input.Reader.ReadAllAsync())
         {
+            Logger.Instance.Verbose("Received {type} from {handshake}", msg.GetMsgType(), handshake);
             var target = msg.GetMsgType() switch
             {
                 MessageType.Piece => PieceMessages,
@@ -40,7 +42,7 @@ public class MessageDispatcher(Channel<Message> input)
             };
 
             if (target is not null)
-                await target.Writer.WriteAsync(msg, ct);
+                await target.Writer.WriteAsync(msg);
         }
 
         PieceMessages.Writer.Complete();

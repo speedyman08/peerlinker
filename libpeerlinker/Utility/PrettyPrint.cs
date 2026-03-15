@@ -1,17 +1,26 @@
-﻿using BencodeNET.Objects;
+﻿using System.Text;
+using BencodeNET.Objects;
 
 namespace libpeerlinker.Utility;
 
-public class PrettyPrint
+public class BencodePrettyPrinter
 {
-    private static void TabNesting(int nesting)
+    private readonly StringBuilder _builder = new();
+   
+    public string StringRepresentation(IBObject obj)
     {
-        foreach (var _ in Enumerable.Range(0, nesting))
+        PrintComplex(obj);
+        return _builder.ToString();
+    }
+    
+    private void TabNesting(int nesting)
+    {
+        foreach (var _ in Enumerable.Range(0, nesting - 1))
         {
-            Console.Write("\t");
+            _builder.Append("\t");
         }
     }
-    private static void PrintComplex(IBObject obj, int nesting = 0)
+    private void PrintComplex(IBObject obj, int nesting = 0)
     {
         if (obj is BDictionary b)
         {
@@ -21,7 +30,7 @@ public class PrettyPrint
             }
             else
             {
-                Console.WriteLine("...nesting limit");
+                _builder.Append("...nesting limit\n");
             }
         }
         else if (obj is BList ls)
@@ -32,11 +41,11 @@ public class PrettyPrint
             }
             else
             {
-                Console.WriteLine("...nesting limit");
+                _builder.Append("...nesting limit\n");
             }
         }
 }
-    public static void DebugDict(BDictionary benDict, int nesting = 0)
+    private void DebugDict(BDictionary benDict, int nesting = 0)
     {
         foreach (var key in benDict.Keys)
         {
@@ -47,17 +56,17 @@ public class PrettyPrint
             {
                 if (s.Length > 200)
                 {
-                    Console.WriteLine($"{key}: [{s.Length} characters]");
+                    _builder.Append($"{key}: [{s.Length} characters]\n");
                     continue;
                 }
             }
-            Console.WriteLine($"{key}: {benDict[key]}");
+            _builder.Append($"{key}: {benDict[key]}\n");
 
             PrintComplex(benDict[key], nesting);
         }
     }
 
-    public static void DebugList(BList list, int nesting = 0)
+    private void DebugList(BList list, int nesting = 0)
     {
         var idx = 0;
         foreach (var item in list)
@@ -68,17 +77,17 @@ public class PrettyPrint
             {
                 if (s.Length > 200)
                 {
-                    Console.WriteLine($"{idx+1}: [{s.Length}] characters");
+                    _builder.Append($"{idx+1}: [{s.Length}] characters\n");
                     continue;
                 }
             }
             if (idx > 300)
             {
-                Console.WriteLine("[too many items]");
+                _builder.Append("[too many items]\n");
                 break;
             }
             
-            Console.WriteLine($"{idx + 1}: {item}");
+            _builder.Append($"{idx + 1}: {item}\n");
             
             idx++;
             PrintComplex(item, nesting);

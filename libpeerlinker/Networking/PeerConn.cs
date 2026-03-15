@@ -2,6 +2,7 @@ using System.Buffers.Binary;
 using System.Net.Sockets;
 using System.Threading.Channels;
 using libpeerlinker.Messages;
+using libpeerlinker.Utility;
 
 namespace libpeerlinker.Peers;
 
@@ -17,7 +18,9 @@ public class PeerConn : IDisposable
    public int Priority { get; set; } = 5;
    public TcpClient Connection { get; init; }
    private NetworkStream Ns { get; }
+   private Channel<Message> MessageChannel { get; } = Channel.CreateUnbounded<Message>();
    public MessageDispatcher Messages { get; }
+   
    public Handshake? Handshake { get; set; }
    
    // Initially both are choked and no interest
@@ -36,54 +39,13 @@ public class PeerConn : IDisposable
       Ns = Connection.GetStream();
       Handshake = handshake;
 
-      var mainChannel = Channel.CreateUnbounded<Message>();
-      _ = new MessageReceiver(Ns, mainChannel).MessageLoop();
       
-      Messages = new MessageDispatcher(mainChannel);
+      // initiate the message pump and the dispatcher to channels
+      _ = new MessageReceiver(Ns, MessageChannel, handshake).MessageLoop();
+      
+      Messages = new MessageDispatcher(MessageChannel, handshake);
       _ = Messages.RunAsync();
    }
-
-   // public async Task<Message?> RecvMessage()
-   // {
-   //    try
-   //    {
-   //       var ctsSource = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-   //       var msgLenBytes = new byte[4];
-   //       await Ns.ReadExactlyAsync(msgLenBytes, 0, 4, ctsSource.Token);
-   //       var msgLenAsInt = BinaryPrimitives.ReadInt32BigEndian(msgLenBytes);
-   //
-   //       var fullMsg = new byte[msgLenAsInt + 4];
-   //       msgLenBytes.CopyTo(fullMsg, 0);
-   //
-   //       await Ns.ReadExactlyAsync(fullMsg, 4, msgLenAsInt, ctsSource.Token);
-   //
-   //       var msgObj = MessageFactory.MakeFromBytes(fullMsg);
-   //
-   //       if (msgObj.Header.messageID == MessageType.Choke)
-   //       {
-   //          MeChoked = true;
-   //       }
-   //       else if (msgObj.Header.messageID == MessageType.Unchoke)
-   //       {
-   //          MeChoked = false;
-   //       }
-   //
-   //       return msgObj;
-   //    }
-   //    catch (OperationCanceledException)
-   //    {
-   //       return null;
-   //    }
-   //    catch (EndOfStreamException)
-   //    {
-   //       return null;
-   //    }
-   //    catch (Exception e)
-   //    {
-   //       return null;
-   //    }
-   // }
-
    public async Task<bool> SendMessage(Message msg)
    {
       try
@@ -117,9 +79,23 @@ public class PeerConn : IDisposable
       await SendMessage(msg);
 
       var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-      var firstPiece = await Messages.PieceMessages.Reader.ReadAsync(cts.Token);
 
-      return firstPiece.Payload;
+      try
+      {
+         var firstPiece = await Messages.PieceMessages.Reader.ReadAsync(cts.Token);
+
+         return firstPiece.Payload;
+      }
+      catch (OperationCanceledException)
+      {
+         Logger.Instance.Verbose("Timed out waiting for block from peer {peer}", Handshake);
+         return null;
+      }
+      catch (ChannelClosedException) // this may happen if the network stream received EOF, where then the dispatcher closes all channels
+      {
+         Logger.Instance.Verbose("Peer {peer} closed channel before piece message", Handshake);
+         return null;
+      }
    }
    
    private void Dispose(bool disposing)
@@ -127,6 +103,7 @@ public class PeerConn : IDisposable
       if (disposing)
       {
          Connection.Dispose();
+         MessageChannel.Writer.Complete();
       }
    }
 

@@ -141,6 +141,7 @@ public class Tracker
             $"&event=started" +
             $"&compact=1";
 
+        Logger.Instance.Information("Announce query string: {QueryString}", queryStr);
         var fullUri = new Uri(m_httpClient.BaseAddress + queryStr, new UriCreationOptions
         {
             // god, what is this
@@ -172,6 +173,7 @@ public class Tracker
         }
         catch (TaskCanceledException ex)
         {
+            Logger.Instance.Fatal("Tracker request timed out");
             throw new TrackerException($"Timed out: {ex.Message}");
         }
 
@@ -179,13 +181,11 @@ public class Tracker
         var dump = new BDictionary(responseDict.Where(entry => 
                                                                   entry.Key != "peers"
                                                                && entry.Key != "peers6"));
-
-        PrettyPrint.DebugDict(dump);
+        var printer = new BencodePrettyPrinter();
+        var log = printer.StringRepresentation(dump);
+        Logger.Instance.Debug("Tracker response dump:\n{log}", log);
 #endif
         var peers = ParsePeerList(responseDict);
-
-#if DEBUG
-#endif
 
         // Sometimes, trackers will only send the interval and the compact peer list.
         // so we can just zero out these optionals
@@ -195,6 +195,9 @@ public class Tracker
         seeders ??= 0;
         leechers ??= 0;
 
+        Logger.Instance.Debug("Tracker announce response: {seeders} seeders, {leechers} leechers, {numPeers} given to us in total", seeders, leechers, peers.Count);
+        Logger.Instance.Verbose("Peer list:");
+        peers.ForEach(peer => Logger.Instance.Debug("{Peer}", peer));
         return new AnnounceResponse(
             peers,
             seeders, leechers

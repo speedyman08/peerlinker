@@ -2,6 +2,7 @@
 using System.Runtime.InteropServices;
 using libpeerlinker.Tracking;
 using libpeerlinker.Messages;
+using libpeerlinker.Utility;
 
 namespace libpeerlinker.Peers;
 
@@ -98,6 +99,8 @@ public class PeerFinder
             await netStream.ReadExactlyAsync(response, 0, response.Length, ioCts.Token);
 
             Handshake responseHandshake = Handshake.FromBytes(response);
+
+            Logger.Instance.Information("Handshake successful with {PeerIdentifier}", responseHandshake);
             
             PeerConn peerConn = new(conn, responseHandshake);
 

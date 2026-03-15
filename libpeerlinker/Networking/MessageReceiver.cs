@@ -2,10 +2,11 @@ using System.Buffers.Binary;
 using System.Net.Sockets;
 using System.Threading.Channels;
 using libpeerlinker.Messages;
+using libpeerlinker.Utility;
 
 namespace libpeerlinker.Peers;
 
-public class MessageReceiver(NetworkStream ns, Channel<Message> output)
+public class MessageReceiver(NetworkStream ns, Channel<Message> output, Handshake handshake)
 {
     private readonly CancellationTokenSource _timerSource = new(TimeSpan.FromMinutes(2));
 
@@ -28,15 +29,22 @@ public class MessageReceiver(NetworkStream ns, Channel<Message> output)
             {
                 _timerSource.TryReset();
             }
-            
+
             return msgObj;
         }
         catch (OperationCanceledException)
         {
+            Logger.Instance.Debug("Message receive for {identifier} timed out with no keepalives sent", handshake);
             return null;
         }
-        catch
+        catch (EndOfStreamException)
         {
+            Logger.Instance.Debug("Peer {identifier} disconnected :(", handshake);
+            return null;
+        }
+        catch(Exception e)
+        {
+            Logger.Instance.Debug("Unknown error occured while receiving message: {error}", e.Message);
             return null;
         }
     }
@@ -54,6 +62,7 @@ public class MessageReceiver(NetworkStream ns, Channel<Message> output)
             await output.Writer.WriteAsync(msg, _timerSource.Token);
         }
 
+        Logger.Instance.Debug("Message pump completed for {identifier}", handshake);
         output.Writer.Complete(); 
     }
 }

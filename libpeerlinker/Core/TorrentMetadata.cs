@@ -61,6 +61,10 @@ public class TorrentMetadata
                 "which isn't supported yet.");
         }
 
+        #if DEBUG
+        var log = new BencodePrettyPrinter().StringRepresentation(benDict);
+        Logger.Instance.Debug("Torrent metadata dictionary:\n{structure}", log);
+        #endif
         var infoDict = BencodeUtility.GetKeyExcept<BDictionary>(benDict, "info");
         
         // get pieces SHA-1 hash set

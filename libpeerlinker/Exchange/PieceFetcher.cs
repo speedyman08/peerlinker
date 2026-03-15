@@ -1,6 +1,8 @@
 using System.ComponentModel;
+using System.Threading.Channels;
 using libpeerlinker.Messages;
 using libpeerlinker.Peers;
+using libpeerlinker.Utility;
 
 namespace libpeerlinker.Exchange;
 
@@ -18,7 +20,6 @@ public class PieceFetcher
     {
        _finder = new PeerFinder(handshake);
        _reachablePeers = reachable;
-
        ActiveConnections.ListChanged += OnConnect;
     }
     
@@ -36,11 +37,13 @@ public class PieceFetcher
        if (e.ListChangedType == ListChangedType.ItemAdded)
        {
           var handle = ActiveConnections[e.NewIndex];
+          Logger.Instance.Information("Using peer connection {peer}", handle.Handshake);
           var cts = new CancellationTokenSource(TimeSpan.FromSeconds(2));
 
           Message res;
-          
-          try {
+
+          try
+          {
              res = await handle.Messages.BitfieldMessages.Reader.ReadAsync(cts.Token);
           }
           catch (OperationCanceledException)
@@ -48,28 +51,55 @@ public class PieceFetcher
              KillPeer(handle);
              return;
           }
+          catch (ChannelClosedException)
+          {
+             KillPeer(handle);
+             return;
+          }
           
           // payload can't be null
           handle.BitField = res.Payload!;
+          Logger.Instance.Information("Got bitfield from peer {peer}", handle.Handshake);
           // send keepalive
           await handle.SendKeepAlive();
+          Logger.Instance.Information("Sent keepalive to peer {peer}", handle.Handshake);
        }
     }
 
     async Task MainLoop()
     {
        var handle = ActiveConnections[Random.Shared.Next(ActiveConnections.Count)];
-       
+       Logger.Instance.Information("Picked random peer {peer}", handle.Handshake);
        // try get the first block for now
        
        var interestMsg = MessageFactory.MakeInterested();
        await handle.SendMessage(interestMsg);
+       Logger.Instance.Information("Sent interested message to peer {peer}", handle.Handshake);
+      
+       // we need to wait for the unchoke message
+       try
+       {
+          var unchokeToken = new CancellationTokenSource(TimeSpan.FromSeconds(2)).Token;
+          Logger.Instance.Information("Waiting for unchoke message from peer {peer}", handle.Handshake);
+          await handle.Messages.UnchokeMessages.Reader.WaitToReadAsync(unchokeToken);
+       }
+       catch (OperationCanceledException)
+       {
+          Logger.Instance.Fatal("{peer} never unchoked us", handle.Handshake);
+          KillPeer(handle);
+          return;
+       }
+       Logger.Instance.Information("Peer {peer} unchoked us", handle.Handshake);
        
        var res = await handle.GetBlock(0, 0, BlockLength);
        if (res is null)
        {
+          Logger.Instance.Fatal("Failed to get block from peer {peer}", handle.Handshake);
+          KillPeer(handle);
           return;
        }
+       Logger.Instance.Information("Got the first block from peer {peer}", handle.Handshake);
+       Logger.Instance.Debug("Block bytes: {bytes}", Convert.ToHexString(res));
     }
 
     void KillPeer(PeerConn conn)

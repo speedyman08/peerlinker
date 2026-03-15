@@ -1,11 +1,15 @@
 using Serilog;
-using Serilog.Sinks.SpectreConsole;
+using Serilog.Events;
+using Serilog.Sinks.Spectre;
 
 namespace libpeerlinker.Utility;
 
 public static class Logger
 {
     public static ILogger Instance { get; } = new LoggerConfiguration()
-        .WriteTo.SpectreConsole()
+        #if DEBUG
+        .MinimumLevel.Verbose()
+        #endif
+        .WriteTo.Spectre()
         .CreateLogger();
 }
