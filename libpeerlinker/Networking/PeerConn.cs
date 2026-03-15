@@ -33,19 +33,33 @@ public class PeerConn : IDisposable
    // Don't use this constructor directly, you can get a PeerConn object from the PeerFinder.Handshake method
    public PeerConn(TcpClient conn, Handshake handshake)
    {
-      if (!conn.Connected) throw new ArgumentException("(PeerConn) The TCP Client provided isn't connected to anything yet");
+      if (!conn.Connected)
+         throw new ArgumentException("(PeerConn) The TCP Client provided isn't connected to anything yet");
 
       Connection = conn;
       Ns = Connection.GetStream();
       Handshake = handshake;
 
-      
+
       // initiate the message pump and the dispatcher to channels
       _ = new MessageReceiver(Ns, MessageChannel, handshake).MessageLoop();
-      
+
       Messages = new MessageDispatcher(MessageChannel, handshake);
-      _ = Messages.RunAsync();
+      
+      Messages.OnChoke = () =>
+      {
+         MeChoked = true;
+         Logger.Instance.Debug("Peer {peer} choked us", Handshake);
+      };
+      Messages.OnUnchoke = () =>
+      {
+         MeChoked = false;
+         Logger.Instance.Debug("Peer {peer} unchoked us", Handshake);
+      };
+
+   _ = Messages.RunAsync();
    }
+   
    public async Task<bool> SendMessage(Message msg)
    {
       try

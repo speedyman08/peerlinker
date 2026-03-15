@@ -20,6 +20,10 @@ public class MessageDispatcher(Channel<Message> input, Handshake handshake)
     public Channel<Message> KeepAliveMessages { get; } = Channel.CreateUnbounded<Message>();
 
 
+    // what we execute in peerconn in the case we're choked 
+    public Action? OnChoke { get; set; }
+    public Action? OnUnchoke { get; set; }
+
     private Channel<Message>? FetchChannel(MessageType type)
     {
         return type switch
@@ -38,6 +42,7 @@ public class MessageDispatcher(Channel<Message> input, Handshake handshake)
             _ => null
         };
     }
+
     public async Task RunAsync()
     {
         await foreach (var msg in input.Reader.ReadAllAsync())
@@ -45,12 +50,21 @@ public class MessageDispatcher(Channel<Message> input, Handshake handshake)
             Logger.Instance.Verbose("Received {type} from {handshake}", msg.GetMsgType(), handshake);
             var target = FetchChannel(msg.GetMsgType());
 
+            if (msg.GetMsgType() == MessageType.Choke)
+            {
+                OnChoke?.Invoke();
+            }
+            else if (msg.GetMsgType() == MessageType.Unchoke)
+            {
+                OnUnchoke?.Invoke();
+            }
+
             if (target is not null)
                 await target.Writer.WriteAsync(msg);
         }
 
         Logger.Instance.Debug("Message channel closed for {peer}", handshake);
-        
+
         PieceMessages.Writer.Complete();
         ChokeMessages.Writer.Complete();
         UnchokeMessages.Writer.Complete();
@@ -69,7 +83,7 @@ public class MessageDispatcher(Channel<Message> input, Handshake handshake)
         try
         {
             var channel = FetchChannel(type);
-            if (channel is not null) 
+            if (channel is not null)
                 return await channel.Reader.ReadAsync(token);
         }
         catch (OperationCanceledException)
@@ -79,7 +93,8 @@ public class MessageDispatcher(Channel<Message> input, Handshake handshake)
         }
         catch (ChannelClosedException)
         {
-            Logger.Instance.Verbose("Channel is closed before {type} read (so we received a null recv in MessageReceiver)", type);
+            Logger.Instance.Verbose(
+                "Channel is closed before {type} read (so we received a null recv in MessageReceiver)", type);
             return null;
         }
 

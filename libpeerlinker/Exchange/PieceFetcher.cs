@@ -76,7 +76,6 @@ public class PieceFetcher
           KillPeer(handle);
           return;
        }
-       handle.MeChoked = false;
        
        Logger.Instance.Information("Peer {peer} unchoked us", handle.Handshake);
        
