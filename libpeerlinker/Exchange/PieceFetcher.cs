@@ -61,24 +61,28 @@ public class PieceFetcher
     {
        var handle = ActiveConnections[Random.Shared.Next(ActiveConnections.Count)];
        Logger.Instance.Information("Picked random peer {peer}", handle.Handshake);
-       // try get the first block for now
        
        var interestMsg = MessageFactory.MakeInterested();
        await handle.SendMessage(interestMsg);
        Logger.Instance.Information("Sent interested message to peer {peer}", handle.Handshake);
       
-       // we need to wait for the unchoke message
-       var unchokeToken = new CancellationTokenSource(TimeSpan.FromSeconds(2)).Token;
-       var unchokeMsg = await handle.Messages.BlockUntilRead(MessageType.Unchoke, unchokeToken);
-       if (unchokeMsg is null)
+       // for any case we are choked we wait for a fresh unchoke message, after we expressed interest
+       if (handle.MeChoked)
        {
-          Logger.Instance.Fatal("peer {peer} did not unchoke us in time", handle.Handshake);
-          KillPeer(handle);
-          return;
+          handle.Messages.FlushChannel(MessageType.Unchoke); // flush the channel 
+          
+          var unchokeToken = new CancellationTokenSource(TimeSpan.FromSeconds(5)).Token;
+          var unchokeMsg = await handle.Messages.BlockUntilRead(MessageType.Unchoke, unchokeToken);
+          if (unchokeMsg is null)
+          {
+             Logger.Instance.Fatal("peer {peer} did not unchoke us in time", handle.Handshake);
+             KillPeer(handle);
+             return;
+          }
+          Logger.Instance.Information("Received our unchoke from {peer}, proceeding with piece", handle.Handshake);
        }
        
-       Logger.Instance.Information("Peer {peer} unchoked us", handle.Handshake);
-       
+       // handle.mechoked should hopefully be false now
        var res = await handle.GetBlock(0, 0, BlockLength);
        if (res is null)
        {

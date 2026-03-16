@@ -63,7 +63,7 @@ public class MessageDispatcher(Channel<Message> input, Handshake handshake)
                 await target.Writer.WriteAsync(msg);
         }
 
-        Logger.Instance.Debug("Message channel closed for {peer}", handshake);
+        Logger.Instance.Debug("Dispatcher ending for {peer}", handshake);
 
         PieceMessages.Writer.Complete();
         ChokeMessages.Writer.Complete();
@@ -99,5 +99,11 @@ public class MessageDispatcher(Channel<Message> input, Handshake handshake)
         }
 
         return null;
+    }
+    public void FlushChannel(MessageType type)
+    {
+        var channel = FetchChannel(type);
+        if (channel is null) return;
+        while (channel.Reader.TryRead(out _)) { }
     }
 }

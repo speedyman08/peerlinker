@@ -49,12 +49,12 @@ public class PeerConn : IDisposable
       Messages.OnChoke = () =>
       {
          MeChoked = true;
-         Logger.Instance.Debug("Peer {peer} choked us", Handshake);
+         Logger.Instance.Debug("{peer} MeChoke = true", Handshake);
       };
       Messages.OnUnchoke = () =>
       {
          MeChoked = false;
-         Logger.Instance.Debug("Peer {peer} unchoked us", Handshake);
+         Logger.Instance.Debug("{peer} MeChoke = false", Handshake);
       };
 
    _ = Messages.RunAsync();
