@@ -117,10 +117,23 @@ public class PieceFetcher
             }
         });
 
+        // don't want to run too many BlockReq tasks as some tasks could be starved and waiting times for unchokes are depleted
+        var concurrentPeerLimit = new SemaphoreSlim(5);
         var requestTasks = pendingRequests.GroupBy(p => p.Item1)
-            .Select(g => BlockReq(g.Key, g.Select(p => p.Item2).ToList())).ToList();
+            .Select(async g =>
+            {
+                await concurrentPeerLimit.WaitAsync();
+                try
+                {
+                    return await BlockReq(g.Key, g.Select(p => p.Item2).ToList());
+                }
+                finally
+                {
+                    concurrentPeerLimit.Release();
+                }
+                
+            }).ToList();
 
-        await Task.WhenAll(requestTasks);
         foreach (var task in requestTasks)
         {
             if (task.Result is not null)
@@ -141,12 +154,12 @@ public class PieceFetcher
     {
         if (!handle.MeChoked) return true;
 
+        handle.Messages.FlushChannel(MessageType
+            .Unchoke); // we need a fresh unchoke message, older ones could be stale so we consume them
+        
         var interestMsg = MessageFactory.MakeInterested();
         await handle.SendMessage(interestMsg);
         Logger.Instance.Information("Sent interested message to peer {peer}", handle.Handshake);
-
-        handle.Messages.FlushChannel(MessageType
-            .Unchoke); // we need a fresh unchoke message, older ones could be stale so we consume them
 
         var unchokeToken = new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token;
         var unchokeMsg = await handle.Messages.BlockUntilRead(MessageType.Unchoke, unchokeToken);
