@@ -20,7 +20,7 @@ PeerFinder finder = new(handshake);
 Logger.Instance.Information("Initiating handshakes with peers");
 var discoveryResult = await finder.DiscoveryAsync(res.TrackerPeers);
 
-var fetcher = new PieceFetcher(discoveryResult.RespondingPeers, handshake);
+var fetcher = new PieceFetcher(discoveryResult.RespondingPeers, meta, handshake);
 
 Logger.Instance.Information("Starting main piece exchange service");
 await fetcher.Start();

@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.Net.Sockets;
 using System.Threading.Channels;
+using libpeerlinker.Core;
 using libpeerlinker.Messages;
 using libpeerlinker.Utility;
 
@@ -28,7 +29,7 @@ public class PeerConn : IDisposable
    public bool PeerChoked { get; set; } = true;
    public bool MeInterest { get; set; } 
    public bool PeerInterest { get; set; }
-   public byte[] BitField { get; set; } = [];
+   public BitField BitField { get; set; } = new([]);
 
    // Don't use this constructor directly, you can get a PeerConn object from the PeerFinder.Handshake method
    public PeerConn(TcpClient conn, Handshake handshake)
@@ -87,31 +88,43 @@ public class PeerConn : IDisposable
       return await SendMessage(msg);
    }
    
-   public async Task<byte[]?> GetBlock(int pieceIdx, int blockOffset, int blockLength)
-   {
-      if (MeChoked)
-      {
-         Logger.Instance.Verbose("Peer {peer} choked us, we can't request. GetBlock aborted", Handshake);
-         return null;
-      }
-      var msg = MessageFactory.MakeRequest(pieceIdx, blockOffset, blockLength);
-      await SendMessage(msg);
-
-      var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-      
-      var pieceMsg = await Messages.BlockUntilRead(MessageType.Piece, cts.Token);
-      if (pieceMsg is not null) return pieceMsg.Payload;
-      
-      Logger.Instance.Debug("Did not receive block (piece index {pieceIdx}, block offset {blockOffset} from {peer}",pieceIdx, blockOffset, Handshake);
-      return null;
-   }
+   
+   // This is only really meant for 1 block at a time
+   
+   // public async Task<Block?> GetBlock(Message requestMessage)
+   // {
+   //    if (MeChoked)
+   //    {
+   //       Logger.Instance.Verbose("Peer {peer} choked us, we can't request. GetBlock aborted", Handshake);
+   //       return null;
+   //    }
+   //    
+   //    var pieceIdx = BinaryPrimitives.ReadInt32BigEndian(requestMessage.Payload.AsSpan(0,4));
+   //    var blockOffset = BinaryPrimitives.ReadInt32BigEndian(requestMessage.Payload.AsSpan(4,4));
+   //    var len = BinaryPrimitives.ReadInt32BigEndian(requestMessage.Payload.AsSpan(8,4));
+   //
+   //    
+   //    await SendMessage(requestMessage);
+   //
+   //    var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+   //    
+   //    var pieceMsg = await Messages.BlockUntilRead(MessageType.Piece, cts.Token);
+   //    if (pieceMsg is not null)
+   //    {
+   //       Logger.Instance.Debug("Received block (piece index {pieceIdx}, block offset {blockOffset}, len {len} from {peer}",pieceIdx, blockOffset, len, Handshake);
+   //       
+   //       return Block.FromPiece(pieceMsg);
+   //    }
+   //    
+   //    Logger.Instance.Debug("Did not receive block (piece index {pieceIdx}, block offset {blockOffset}, len {len} from {peer}",pieceIdx, blockOffset, len, Handshake);
+   //    return null;
+   // }
    
    private void Dispose(bool disposing)
    {
       if (disposing)
       {
          Connection.Dispose();
-         MessageChannel.Writer.Complete();
       }
    }
 
