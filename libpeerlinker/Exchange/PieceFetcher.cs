@@ -70,7 +70,7 @@ public class PieceFetcher
         var pieceIndices = Enumerable.Range(0, numPieces).Shuffle().ToList();
 
 
-        var blocks = await FullFillPieces(pieceIndices.Slice(0, 50));
+        var blocks = await FullFillPieces(pieceIndices.Slice(0,10));
         Logger.Instance.Information("Finis.");
     }
 
@@ -118,7 +118,7 @@ public class PieceFetcher
         });
 
         // don't want to run too many BlockReq tasks as some tasks could be starved and waiting times for unchokes are depleted
-        var concurrentPeerLimit = new SemaphoreSlim(5);
+        var concurrentPeerLimit = new SemaphoreSlim(50);
         var requestTasks = pendingRequests.GroupBy(p => p.Item1)
             .Select(async g =>
             {
@@ -161,19 +161,22 @@ public class PieceFetcher
         await handle.SendMessage(interestMsg);
         Logger.Instance.Information("Sent interested message to peer {peer}", handle.Handshake);
 
-        var unchokeToken = new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token;
+        var unchokeToken = new CancellationTokenSource(TimeSpan.FromSeconds(20)).Token;
         var unchokeMsg = await handle.Messages.BlockUntilRead(MessageType.Unchoke, unchokeToken);
         if (unchokeMsg is null)
         {
-            Logger.Instance.Fatal("peer {peer} did not unchoke us in 10 seconds", handle.Handshake);
+            Logger.Instance.Fatal("peer {peer} did not unchoke us in 20 seconds", handle.Handshake);
             return false;
         }
 
         return true;
     }
 
+    
     private async Task<List<Block>?> BlockReq(PeerConn handle, List<Message> blockMsgs)
     {
+        List<Block> received = new();
+        
         foreach (var msg in blockMsgs)
         {
             if (msg.GetMsgType() != MessageType.Request)
@@ -188,35 +191,72 @@ public class PieceFetcher
             if (!unchokeSuccess) return null;
         }
 
-        // fire everything at once then look at our piece channel
-        foreach (var msg in blockMsgs)
-            await handle.SendMessage(msg);
+        var inPipeline = 0;
+        var lastSentIdx = 0;
+        // initially saturate messages
+        while (inPipeline < 5)
+        {
+            if (lastSentIdx >= blockMsgs.Count) break;
+            await handle.SendMessage(blockMsgs[lastSentIdx]);
+            lastSentIdx++;
+            inPipeline++;
+        }
 
-        var blocks = new List<Block>();
 
-
-        for (int i = 0; i < blockMsgs.Count; i++)
+        while (inPipeline > 0)
         {
             if (handle.MeChoked)
             {
                 Logger.Instance.Debug("Peer {peer} choked us mid-transfer after {count}/{total} blocks",
-                    handle.Handshake, i, blockMsgs.Count);
+                    handle.Handshake, lastSentIdx, blockMsgs.Count);
                 break;
-            }
-            
-            var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-            var pieceMsg = await handle.Messages.BlockUntilRead(MessageType.Piece, cts.Token);
+            }   
+            var token = new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token;
+            var pieceMsg = await handle.Messages.BlockUntilRead(MessageType.Piece, token);
             if (pieceMsg is null)
             {
                 Logger.Instance.Debug("Peer {peer} stopped responding after {count}/{total} blocks",
-                    handle.Handshake, i, blockMsgs.Count);
+                    handle.Handshake, lastSentIdx, blockMsgs.Count);
                 break;
             }
 
-            blocks.Add(Block.FromPiece(pieceMsg));
+            inPipeline--;
+            received.Add(Block.FromPiece(pieceMsg));
+
+            if (lastSentIdx < blockMsgs.Count)
+            {
+                await handle.SendMessage(blockMsgs[lastSentIdx++]);
+                inPipeline++;
+            }
         }
 
-        return blocks;
+        return received;
+
+        // var blocks = new List<Block>();
+        //
+
+        // for (int i = 0; i < blockMsgs.Count; i++)
+        // {
+        //     if (handle.MeChoked)
+        //     {
+        //         Logger.Instance.Debug("Peer {peer} choked us mid-transfer after {count}/{total} blocks",
+        //             handle.Handshake, i, blockMsgs.Count);
+        //         break;
+        //     }
+        //     
+        //     var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+        //     var pieceMsg = await handle.Messages.BlockUntilRead(MessageType.Piece, cts.Token);
+        //     if (pieceMsg is null)
+        //     {
+        //         Logger.Instance.Debug("Peer {peer} stopped responding after {count}/{total} blocks",
+        //             handle.Handshake, i, blockMsgs.Count);
+        //         break;
+        //     }
+        //
+        //     blocks.Add(Block.FromPiece(pieceMsg));
+        // }
+        //
+        // return blocks;
     }
 
 

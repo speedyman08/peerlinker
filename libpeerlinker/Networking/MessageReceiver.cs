@@ -22,14 +22,9 @@ public class MessageReceiver(NetworkStream ns, Channel<Message> output, Handshak
             msgLenBytes.CopyTo(fullMsg, 0);
 
             await ns.ReadExactlyAsync(fullMsg, 4, msgLenAsInt, _timerSource.Token);
-
+            _timerSource.TryReset();
+            
             var msgObj = MessageFactory.MakeFromBytes(fullMsg);
-
-            if (msgObj.Header.messageID == MessageType.KeepAlive)
-            {
-                _timerSource.TryReset();
-            }
-
             return msgObj;
         }
         catch (OperationCanceledException)
