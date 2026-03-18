@@ -17,6 +17,8 @@ public class PeerConn : IDisposable
    /// Heuristic value 0-10 depicting how useful a peer has been to me
    /// </summary>
    public int Priority { get; set; } = 5;
+
+   public int BlocksDownloaded { get; set; } = 0;
    public TcpClient Connection { get; init; }
    private NetworkStream Ns { get; }
    private Channel<Message> MessageChannel { get; } = Channel.CreateUnbounded<Message>();
