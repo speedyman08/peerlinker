@@ -7,9 +7,9 @@ namespace libpeerlinker.Utility;
 public static class Logger
 {
     public static ILogger Instance { get; } = new LoggerConfiguration()
-        // #if DEBUG
+        #if DEBUG
         .MinimumLevel.Verbose()
-        // #endif
+        #endif
         .WriteTo.Spectre()
         .CreateLogger();
 }

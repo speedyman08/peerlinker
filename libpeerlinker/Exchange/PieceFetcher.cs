@@ -67,7 +67,7 @@ public class PieceFetcher
         Logger.Instance.Information("File has {num}", numPieces);
         var pieceIndices = Enumerable.Range(0, numPieces).Shuffle().ToList();
 
-        var blocks = await FullFillPieces(pieceIndices.Slice(0, 1500));
+        var blocks = await FullFillPieces(pieceIndices);
         Logger.Instance.Information("Finis.");
     }
 
@@ -104,8 +104,8 @@ public class PieceFetcher
 
     async Task<QueryResult> ProcessRequest(IGrouping<PeerConn, (PeerConn, Message)> requestGroup, SemaphoreSlim tasksRunning)
     {
-        // everyone gets like 20 seconds to give us their pieces
-        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(20));
+        // everyone gets 2 min to give us as much as possible
+        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         await tasksRunning.WaitAsync();
         try
         {
@@ -169,7 +169,8 @@ public class PieceFetcher
         {
             blocksReceived.AddRange(taskResult.Result.ReceivedBlocks);
             // remove all messages that were responded to
-            assigned.RemoveWhere(msg => taskResult.Result.ReceivedBlocks.Any(block => BlockIsForRequest(block, msg)));
+            assigned.RemoveWhere(msg => 
+                taskResult.Result.ReceivedBlocks.Any(block => BlockIsForRequest(block, msg)));
         }
         
         Logger.Instance.Information("Received {blocks} blocks out of {expected} needed", blocksReceived.Count,
@@ -206,11 +207,11 @@ public class PieceFetcher
     }
 
 
-    private async Task<List<Block>?> BlockReq(PeerConn handle, List<Message> blockMsgs, CancellationToken ct)
+    private async Task<List<Block>?> BlockReq(PeerConn handle, List<Message> requestMsgs, CancellationToken ct)
     {
         List<Block> received = new();
         
-        foreach (var msg in blockMsgs)
+        foreach (var msg in requestMsgs)
         {
             if (msg.GetMsgType() != MessageType.Request)
             {
@@ -223,33 +224,49 @@ public class PieceFetcher
             var unchokeSuccess = await TryUnchoke(handle);
             if (!unchokeSuccess) return null;
         }
+        
+        // Flush any channels we use to remove stale shit
+        handle.Messages.FlushChannel(MessageType.Choke);
+        handle.Messages.FlushChannel(MessageType.Piece);
 
         var inPipeline = 0;
         var lastSentIdx = 0;
         // initially saturate messages
         while (inPipeline < 5)
         {
-            if (lastSentIdx >= blockMsgs.Count) break;
-            await handle.SendMessage(blockMsgs[lastSentIdx]);
+            if (lastSentIdx >= requestMsgs.Count) break;
+            await handle.SendMessage(requestMsgs[lastSentIdx]);
             lastSentIdx++;
             inPipeline++;
         }
 
-
         while (inPipeline > 0 && !ct.IsCancellationRequested)
         {
-            if (handle.MeChoked)
+            if (received.Count % 100 == 0 && received.Count > 0)
             {
-                Logger.Instance.Debug("Peer {peer} choked us mid-transfer after {count}/{total} blocks",
-                    handle.Handshake, received.Count, blockMsgs.Count);
-                break;
-            }   
+                Logger.Instance.Information("{peer}: {downloaded}/{needed} blocks downloaded", 
+                    handle.Handshake, lastSentIdx, requestMsgs.Count);
+            }
+            
             var token = new CancellationTokenSource(TimeSpan.FromSeconds(10)).Token;
-            var pieceMsg = await handle.Messages.BlockUntilRead(MessageType.Piece, token);
+            
+            var pieceTask = handle.Messages.BlockUntilRead(MessageType.Piece, token);
+            var chokeTask = handle.Messages.BlockUntilRead(MessageType.Choke, token);
+            
+            var receive = await Task.WhenAny(chokeTask, pieceTask);
+            if (receive == chokeTask)
+            {
+                Logger.Instance.Information("Peer {peer} choked us after {count}/{total} blocks", 
+                    handle.Handshake, received.Count, requestMsgs.Count);
+                return null;
+            }
+
+            var pieceMsg = await pieceTask;
+            
             if (pieceMsg is null)
             {
-                Logger.Instance.Debug("Peer {peer} stopped responding after {count}/{total} blocks",
-                    handle.Handshake, received.Count, blockMsgs.Count);
+                Logger.Instance.Information("Peer {peer} stopped responding after {count}/{total} blocks",
+                    handle.Handshake, received.Count, requestMsgs.Count);
                 break;
             }
 
@@ -257,14 +274,15 @@ public class PieceFetcher
             received.Add(Block.FromPiece(pieceMsg));
             handle.BlocksDownloaded++;
 
-            if (lastSentIdx < blockMsgs.Count && !ct.IsCancellationRequested)
+            if (lastSentIdx < requestMsgs.Count && !ct.IsCancellationRequested)
             {
-                await handle.SendMessage(blockMsgs[lastSentIdx++]);
+                await handle.SendMessage(requestMsgs[lastSentIdx++]);
                 inPipeline++;
             }
         }
         
-        Logger.Instance.Information("Peer {peer} gave us {received}/{needed} within time limit of 20 sec", handle.Handshake, received.Count, blockMsgs.Count);
+        Logger.Instance.Information("Peer {peer} gave us {received}/{needed} within time limit of 2 min", 
+            handle.Handshake, received.Count, requestMsgs.Count);
         
         return received;
     }
