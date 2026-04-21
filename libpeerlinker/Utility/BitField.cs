@@ -4,7 +4,7 @@ namespace libpeerlinker.Utility;
 /// A read-only view over a byte array, treating it as a bitfield
 /// where each bit represents whether a piece is available.
 /// </summary>
-public readonly struct BitField(byte[] data)
+public readonly struct BitField(byte[] byteArray)
 {
     public bool HasPiece(int index)
     {
@@ -12,12 +12,21 @@ public readonly struct BitField(byte[] data)
         int byteIndex = index / 8;
         // the bit that we need counted from rightmost bit
         int bitOffset = 7 - (index % 8); 
-        if (byteIndex < 0 || byteIndex >= data.Length)
+        if (byteIndex < 0 || byteIndex >= byteArray.Length)
             return false;
-        return (data[byteIndex] & (1 << bitOffset)) != 0;
+        return (byteArray[byteIndex] & (1 << bitOffset)) != 0;
     }
 
-    public int Length => data.Length * 8;
+    public void SetPiece(int index)
+    {
+        int byteIndex = index / 8;
+        int bitOffset = 7 - (index % 8); 
+        if (byteIndex < 0 || byteIndex >= byteArray.Length)
+            throw new ArgumentOutOfRangeException(nameof(index), "Index out of range for bitfield");
 
-    public bool IsEmpty => data.Length == 0;
+        byteArray[byteIndex] |= (byte)(1 << bitOffset);
+    }
+    public int Length => byteArray.Length * 8;
+
+    public bool IsEmpty => byteArray.Length == 0;
 }

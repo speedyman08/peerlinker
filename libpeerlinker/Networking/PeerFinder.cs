@@ -106,22 +106,6 @@ public class PeerFinder
 
             return peerConn;
         }
-        catch (SocketException)
-        {
-            return null;
-        }
-        catch (EndOfStreamException)
-        {
-            return null;
-        }
-        catch (OperationCanceledException)
-        {
-            return null;
-        }
-        catch (IOException)
-        {
-            return null;
-        }
         catch
         {
             return null;

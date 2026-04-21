@@ -88,7 +88,6 @@ public class MessageDispatcher(Channel<Message> input, Handshake handshake)
         }
         catch (OperationCanceledException)
         {
-            Logger.Instance.Verbose("Token expired before {type} read", type);
             return null;
         }
         catch (ChannelClosedException)

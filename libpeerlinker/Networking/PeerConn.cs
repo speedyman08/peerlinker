@@ -91,37 +91,6 @@ public class PeerConn : IDisposable
    }
    
    
-   // This is only really meant for 1 block at a time
-   
-   // public async Task<Block?> GetBlock(Message requestMessage)
-   // {
-   //    if (MeChoked)
-   //    {
-   //       Logger.Instance.Verbose("Peer {peer} choked us, we can't request. GetBlock aborted", Handshake);
-   //       return null;
-   //    }
-   //    
-   //    var pieceIdx = BinaryPrimitives.ReadInt32BigEndian(requestMessage.Payload.AsSpan(0,4));
-   //    var blockOffset = BinaryPrimitives.ReadInt32BigEndian(requestMessage.Payload.AsSpan(4,4));
-   //    var len = BinaryPrimitives.ReadInt32BigEndian(requestMessage.Payload.AsSpan(8,4));
-   //
-   //    
-   //    await SendMessage(requestMessage);
-   //
-   //    var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
-   //    
-   //    var pieceMsg = await Messages.BlockUntilRead(MessageType.Piece, cts.Token);
-   //    if (pieceMsg is not null)
-   //    {
-   //       Logger.Instance.Debug("Received block (piece index {pieceIdx}, block offset {blockOffset}, len {len} from {peer}",pieceIdx, blockOffset, len, Handshake);
-   //       
-   //       return Block.FromPiece(pieceMsg);
-   //    }
-   //    
-   //    Logger.Instance.Debug("Did not receive block (piece index {pieceIdx}, block offset {blockOffset}, len {len} from {peer}",pieceIdx, blockOffset, len, Handshake);
-   //    return null;
-   // }
-   
    private void Dispose(bool disposing)
    {
       if (disposing)
