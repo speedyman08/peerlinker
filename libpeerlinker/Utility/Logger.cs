@@ -8,7 +8,7 @@ public static class Logger
 {
     public static ILogger Instance { get; } = new LoggerConfiguration()
         #if DEBUG
-        .MinimumLevel.Verbose()
+        .MinimumLevel.Debug()
         #endif
         .WriteTo.Spectre()
         .CreateLogger();

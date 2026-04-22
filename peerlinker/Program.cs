@@ -4,8 +4,8 @@ using libpeerlinker.Peers;
 using libpeerlinker.Tracking;
 using libpeerlinker.Utility; 
 
-Logger.Instance.Information("Parsing torrent structure of video.torrent");
-TorrentMetadata meta = TorrentMetadata.FromFile("video.torrent");
+Logger.Instance.Information("Parsing torrent structure of debian.torrent");
+TorrentMetadata meta = TorrentMetadata.FromFile("debian.torrent");
 
 var tracker = new Tracker(meta, new Version(0, 0, 1));
 
