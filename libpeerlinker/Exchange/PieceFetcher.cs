@@ -82,7 +82,7 @@ public class PieceFetcher
         Logger.Instance.Information("File has {num} pieces.", _piecesToFetch);
         var pieceIndices = Enumerable.Range(0, _piecesToFetch).Shuffle().ToList();
         var blocksInPiece = (int)Math.Ceiling((double)_meta.PieceLength / _blockLength);
-
+        var cancellation = new CancellationTokenSource();
         var writer = new DiskWriter(_meta, blocksInPiece, _meta.PieceLength * _piecesToFetch,
             (int)_meta.PieceLength, _ourBitField);
 
@@ -96,12 +96,18 @@ public class PieceFetcher
                 PieceAmount, i, _piecesToFetch);
 
             var length = Math.Min(PieceAmount, _piecesToFetch - i);
-            var blocks = await BlockFetchLoop(pieceIndices.GetRange(i, length), blocksInPiece);
+            var blocks = await BlockFetchLoop(pieceIndices.GetRange(i, length), blocksInPiece, cancellation);
             
             RecalculatePickChances(PieceAmount * blocksInPiece);
             
             // now write this to the disk
             await writer.WriteBlockChunk(blocks.ReceivedBlocks);
+
+            if (cancellation.IsCancellationRequested)
+            {
+                Logger.Instance.Information("MainLoop completed");
+                return;
+            }
         }
         // check pieces
 
@@ -112,7 +118,7 @@ public class PieceFetcher
         {
             Logger.Instance.Error("There are {badPieceList.Count} bad pieces. Redownloading them now.",
                 badPieceList.Count);
-            var reFetched = await BlockFetchLoop(badPieceList, blocksInPiece);
+            var reFetched = await BlockFetchLoop(badPieceList, blocksInPiece, cancellation);
             await writer.WriteBlockChunk(reFetched.ReceivedBlocks);
         }
         else
@@ -135,23 +141,20 @@ public class PieceFetcher
         }
     }
     
-    async Task<PieceFullfilmentResult> BlockFetchLoop(List<int> pieceIndices, int blocksInPiece)
+    async Task<PieceFullfilmentResult> BlockFetchLoop(List<int> pieceIndices, int blocksInPiece, CancellationTokenSource outCts)
     {
-        // this is cancelled at any point we have no more peers to split to
-        var cancellation = new CancellationTokenSource();
+        var blocks = await FullFillPieces(pieceIndices, GetMaxPeers(), outCts);
         
-        var blocks = await FullFillPieces(pieceIndices, GetMaxPeers(), cancellation);
-        
-        while (blocks.RemainingRequestsNotSent.Count > 0 && !cancellation.IsCancellationRequested)
+        while (blocks.RemainingRequestsNotSent.Count > 0 && !outCts.IsCancellationRequested)
         {
             Logger.Instance.Information("Now downloading {nowRequests}/{needed}",
                 blocks.RemainingRequestsNotSent.Count, blocksInPiece * PieceAmount);
             
-            var remaining = await FullFillRequestMessages(blocks.RemainingRequestsNotSent, GetMaxPeers(), cancellation);
+            var remaining = await FullFillRequestMessages(blocks.RemainingRequestsNotSent, GetMaxPeers(), outCts);
             blocks.ReceivedBlocks.AddRange(remaining.ReceivedBlocks);
         }
 
-        if (cancellation.IsCancellationRequested)
+        if (outCts.IsCancellationRequested)
         {
             Logger.Instance.Information("Cancelled fetch loop due to no more peers being available. We got choked too many times probably.");
         }
