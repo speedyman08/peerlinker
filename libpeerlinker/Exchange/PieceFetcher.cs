@@ -17,7 +17,7 @@ public class PieceFetcher
     // how many connections we will take from reachable peers.
     private const int MaxConnections = 20;
     private const int PieceAmount = 500;
-    private readonly TimeSpan _maxBlockTime = TimeSpan.FromSeconds(5);
+    private readonly TimeSpan _maxBlockTime = TimeSpan.FromSeconds(3);
     private readonly int _piecesToFetch;
     private readonly int _blockLength = 16000;
     private readonly List<PeerConn> _reachablePeers;
@@ -73,23 +73,20 @@ public class PieceFetcher
     {
         return ActiveConnections
             .Take(MaxConnections)
-            .ToList(); 
+            .ToList();
     }
-    
+
     async Task MainLoop()
     {
         Logger.Instance.Information("File has {num} pieces.", _piecesToFetch);
         var pieceIndices = Enumerable.Range(0, _piecesToFetch).Shuffle().ToList();
         var blocksInPiece = (int)Math.Ceiling((double)_meta.PieceLength / _blockLength);
 
-        var writer = new DiskWriter("test.DAT", blocksInPiece, (int)(_meta.PieceLength * _piecesToFetch),
+        var writer = new DiskWriter(_meta, blocksInPiece, (int)(_meta.PieceLength * _piecesToFetch),
             (int)_meta.PieceLength, _ourBitField);
-        // this does everything, including splitting pieces into blocks
-        // making requests for those blocks in parallel using ActiveConnections
-        // it returns: blocks received, blocks still remaining, blocks whose piece index was not found in any of the active connections
 
-        Logger.Instance.Information("Created a file called test.DAT and preallocated {size} bytes",
-            (int)(_meta.PieceLength * _piecesToFetch));
+        Logger.Instance.Information("Created a file called {name} and preallocated {size} bytes",
+            DiskWriter.TempFileName, (int)(_meta.PieceLength * _piecesToFetch));
         Logger.Instance.Information("Starting to fetch pieces");
 
         for (int i = 0; i < _piecesToFetch; i += PieceAmount)
@@ -98,21 +95,47 @@ public class PieceFetcher
                 PieceAmount, i, _piecesToFetch);
 
             var length = Math.Min(PieceAmount, _piecesToFetch - i);
-            var blocks = await FullFillPieces(pieceIndices.Slice(i, length), GetMaxPeers()); 
-
-            while (blocks.RemainingRequestsNotSent.Count > 0)
-            {
-                Logger.Instance.Information("Now downloading {nowRequests}/{needed}",
-                    blocks.RemainingRequestsNotSent.Count, blocksInPiece * PieceAmount);
-                // TODO: this is kind of a spray and pray, we are randomly reassigning without checking a heuristic for picking the fastest peers
-                // requestsMissing is mutated in this method, the requests for blocks we get successfully are removed
-                var remaining = await FullFillRequestMessages(blocks.RemainingRequestsNotSent, GetMaxPeers());
-                blocks.ReceivedBlocks.AddRange(remaining.ReceivedBlocks);
-            }
+            var blocks = await BlockFetchLoop(pieceIndices.GetRange(i, length), blocksInPiece);
 
             // now write this to the disk
             await writer.WriteBlockChunk(blocks.ReceivedBlocks);
         }
+        // check pieces
+
+        var badPieceList = await writer.VerifyFile();
+
+        Logger.Instance.Information("Verifying pieces downloaded");
+        if (badPieceList.Count > 0)
+        {
+            Logger.Instance.Error("There are {badPieceList.Count} bad pieces. Redownloading them now.",
+                badPieceList.Count);
+            var reFetched = await BlockFetchLoop(badPieceList, blocksInPiece);
+            await writer.WriteBlockChunk(reFetched.ReceivedBlocks);
+        }
+        else
+        {
+            Logger.Instance.Information("{pieces} pieces verified", _piecesToFetch);
+        }
+
+        Logger.Instance.Information("Download done. Splitting into files");
+        await writer.SplitFile();
+    }
+
+    async Task<PieceFullfilmentResult> BlockFetchLoop(List<int> pieceIndices, int blocksInPiece)
+    {
+        var blocks = await FullFillPieces(pieceIndices, GetMaxPeers());
+
+        while (blocks.RemainingRequestsNotSent.Count > 0)
+        {
+            Logger.Instance.Information("Now downloading {nowRequests}/{needed}",
+                blocks.RemainingRequestsNotSent.Count, blocksInPiece * PieceAmount);
+            // TODO: this is kind of a spray and pray, we are randomly reassigning without checking a heuristic for picking the fastest peers
+            // requestsMissing is mutated in this method, the requests for blocks we get successfully are removed
+            var remaining = await FullFillRequestMessages(blocks.RemainingRequestsNotSent, GetMaxPeers());
+            blocks.ReceivedBlocks.AddRange(remaining.ReceivedBlocks);
+        }
+
+        return blocks;
     }
 
     private HashSet<Message> RequestMessagesForPieces(List<int> pieceIndices)
@@ -319,6 +342,7 @@ public class PieceFetcher
                 Logger.Instance.Information("Peer {peer} choked us after {count}/{total} blocks",
                     handle.Handshake, received.Count, requestMsgs.Count);
                 pieceChokeCts.Cancel();
+                KillPeer(handle);
                 return null;
             }
 
