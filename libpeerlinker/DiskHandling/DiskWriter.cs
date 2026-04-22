@@ -21,7 +21,7 @@ public class DiskWriter : IDisposable, IAsyncDisposable
     private readonly List<FileEntry> _metaFiles;
     private readonly Dictionary<int, int> _blocksCounterForPiece = new();
 
-    public DiskWriter(TorrentMetadata meta, int blocksInPiece, int totalSize, int pieceLength, BitField ourBitField)
+    public DiskWriter(TorrentMetadata meta, int blocksInPiece, Int64 totalSize, int pieceLength, BitField ourBitField)
     {
         _handle = new FileStream(TempFileName, FileMode.OpenOrCreate, FileAccess.ReadWrite);
         _blocksInPiece = blocksInPiece;
