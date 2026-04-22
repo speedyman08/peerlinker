@@ -137,15 +137,23 @@ public class PieceFetcher
     
     async Task<PieceFullfilmentResult> BlockFetchLoop(List<int> pieceIndices, int blocksInPiece)
     {
-        var blocks = await FullFillPieces(pieceIndices, GetMaxPeers());
+        // this is cancelled at any point we have no more peers to split to
+        var cancellation = new CancellationTokenSource();
         
-        while (blocks.RemainingRequestsNotSent.Count > 0)
+        var blocks = await FullFillPieces(pieceIndices, GetMaxPeers(), cancellation);
+        
+        while (blocks.RemainingRequestsNotSent.Count > 0 && !cancellation.IsCancellationRequested)
         {
             Logger.Instance.Information("Now downloading {nowRequests}/{needed}",
                 blocks.RemainingRequestsNotSent.Count, blocksInPiece * PieceAmount);
             
-            var remaining = await FullFillRequestMessages(blocks.RemainingRequestsNotSent, GetMaxPeers());
+            var remaining = await FullFillRequestMessages(blocks.RemainingRequestsNotSent, GetMaxPeers(), cancellation);
             blocks.ReceivedBlocks.AddRange(remaining.ReceivedBlocks);
+        }
+
+        if (cancellation.IsCancellationRequested)
+        {
+            Logger.Instance.Information("Cancelled fetch loop due to no more peers being available. We got choked too many times probably.");
         }
 
         return blocks;
@@ -204,14 +212,14 @@ public class PieceFetcher
         };
     }
 
-    private async Task<PieceFullfilmentResult> FullFillPieces(List<int> indices, List<PeerConn> handles)
+    private async Task<PieceFullfilmentResult> FullFillPieces(List<int> indices, List<PeerConn> handles, CancellationTokenSource outCts)
     {
         var requestMessages = RequestMessagesForPieces(indices);
-        return await FullFillRequestMessages(requestMessages, handles);
+        return await FullFillRequestMessages(requestMessages, handles, outCts);
     }
 
     private async Task<PieceFullfilmentResult> FullFillRequestMessages(HashSet<Message> requestMessages,
-        List<PeerConn> handles)
+        List<PeerConn> handles, CancellationTokenSource outCts)
     {
         List<Message> requestsWithNoFoundPiece = new();
         List<Block> blocksReceived = new();
@@ -221,7 +229,18 @@ public class PieceFetcher
         foreach (var msg in requestMessages)
         {
             var pieceIdx = BinaryPrimitives.ReadInt32BigEndian(msg.Payload.AsSpan(0, 4));
-
+            
+            // no more peers to split to, we need to abort
+            if (handles.Count == 0)
+            {
+                await outCts.CancelAsync();
+                return new PieceFullfilmentResult
+                {
+                    ReceivedBlocks = blocksReceived,
+                    RemainingRequestsNotSent = requestMessages,
+                    RequestsNotInSwarm = requestsWithNoFoundPiece
+                };
+            }
             // filter to peers who have this piece
             var eligible = handles.Where(h => h.BitField.HasPiece(pieceIdx)).ToList();
     
