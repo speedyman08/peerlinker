@@ -5,10 +5,10 @@ using libpeerlinker.Tracking;
 using libpeerlinker.Utility;
 
 namespace libpeerlinker.DiskHandling;
-
-// A class for writing received blocks to a file, in order, and validation via a digest.
-// we also update our own bitfield when we have the necessary blocks for a piece.
-
+///<summary>
+/// A class for writing received blocks to a file, in order, and validation via a digest.
+/// we also update our own bitfield when we have the necessary blocks for a piece.
+/// </summary>
 public class DiskWriter : IDisposable, IAsyncDisposable
 {
     public const string TempFileName = "TorrentData.DAT";

@@ -6,6 +6,13 @@ using libpeerlinker.Utility;
 
 namespace libpeerlinker.Peers;
 
+/// <summary>
+/// The class which handles inbound messages from a peer connections
+/// Uses the connections NetworkStream
+/// </summary>
+/// <param name="ns">PeerConn's network stream</param>
+/// <param name="output">The channel to write to on message receive</param>
+/// <param name="handshake">Handshake for logging purposes</param>
 public class MessageReceiver(NetworkStream ns, Channel<Message> output, Handshake handshake)
 {
     private readonly CancellationTokenSource _timerSource = new(TimeSpan.FromMinutes(2));

@@ -4,6 +4,10 @@ using libpeerlinker.Tracking;
 
 namespace libpeerlinker.Messages;
 
+/// <summary>
+/// A struct representing the byte-by-byte structure of the Handshake message, sent to peers to initiate a connection
+/// Can be marshalled and unmarshalled to and from a byte array.
+/// </summary>
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
 public unsafe struct Handshake
 {

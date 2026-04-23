@@ -4,6 +4,12 @@ using libpeerlinker.Utility;
 
 namespace libpeerlinker.Peers;
 
+/// <summary>
+/// MessageDispatcher is responsible for taking the stream of messages in the MessageReceiver loop and distributing them across channels
+/// for every type of message, e.g MessageReceiver gets a Piece message and we distribute it to the PieceMessages channel
+/// </summary>
+/// <param name="input">The input channel to receive messages from</param>
+/// <param name="handshake">Handshake object for logging</param>
 public class MessageDispatcher(Channel<Message> input, Handshake handshake)
 {
     // specific channels for each message type

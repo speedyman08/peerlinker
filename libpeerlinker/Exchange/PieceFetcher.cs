@@ -11,7 +11,7 @@ using libpeerlinker.Utility;
 namespace libpeerlinker.Exchange;
 
 /// <summary>
-/// Main class for exchanging pieces
+/// The main orchestrator for concurrent piece fetching across many connections.
 /// </summary>
 public class PieceFetcher
 {
@@ -141,7 +141,7 @@ public class PieceFetcher
         }
     }
     
-    async Task<PieceFullfilmentResult> BlockFetchLoop(List<int> pieceIndices, int blocksInPiece, CancellationTokenSource outCts)
+    async Task<PieceFulfillmentResult> BlockFetchLoop(List<int> pieceIndices, int blocksInPiece, CancellationTokenSource outCts)
     {
         var blocks = await FullFillPieces(pieceIndices, GetMaxPeers(), outCts);
         
@@ -215,13 +215,13 @@ public class PieceFetcher
         };
     }
 
-    private async Task<PieceFullfilmentResult> FullFillPieces(List<int> indices, List<PeerConn> handles, CancellationTokenSource outCts)
+    private async Task<PieceFulfillmentResult> FullFillPieces(List<int> indices, List<PeerConn> handles, CancellationTokenSource outCts)
     {
         var requestMessages = RequestMessagesForPieces(indices);
         return await FullFillRequestMessages(requestMessages, handles, outCts);
     }
 
-    private async Task<PieceFullfilmentResult> FullFillRequestMessages(HashSet<Message> requestMessages,
+    private async Task<PieceFulfillmentResult> FullFillRequestMessages(HashSet<Message> requestMessages,
         List<PeerConn> handles, CancellationTokenSource outCts)
     {
         List<Message> requestsWithNoFoundPiece = new();
@@ -237,7 +237,7 @@ public class PieceFetcher
             if (handles.Count == 0)
             {
                 await outCts.CancelAsync();
-                return new PieceFullfilmentResult
+                return new PieceFulfillmentResult
                 {
                     ReceivedBlocks = blocksReceived,
                     RemainingRequestsNotSent = requestMessages,
@@ -290,7 +290,7 @@ public class PieceFetcher
             pendingRequestsToSend.Count);
         Logger.Instance.Information("Remaining messages: {remaining}", requestMessages.Count);
 
-        return new PieceFullfilmentResult
+        return new PieceFulfillmentResult
         {
             ReceivedBlocks = blocksReceived,
             RemainingRequestsNotSent = requestMessages,

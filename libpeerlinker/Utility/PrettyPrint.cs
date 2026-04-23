@@ -3,6 +3,9 @@ using BencodeNET.Objects;
 
 namespace libpeerlinker.Utility;
 
+/// <summary>
+/// A pretty printer for Bencoded data that handles nested dicts, nested lists
+/// </summary>
 public class BencodePrettyPrinter
 {
     private readonly StringBuilder _builder = new();

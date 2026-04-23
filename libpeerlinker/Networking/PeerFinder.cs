@@ -6,6 +6,11 @@ using libpeerlinker.Utility;
 
 namespace libpeerlinker.Peers;
 
+/// <summary>
+/// PeerFinder is a class responsible for finding peers to connect to, given a list of IP addresses
+/// It attempts to handshake peers going in chunks of 20.
+/// Returns a PeerConn object on succeess, preserving the initial TCP connection made during the handshake sequence.
+/// </summary>
 public class PeerFinder
 {
     // Peers that have responded.

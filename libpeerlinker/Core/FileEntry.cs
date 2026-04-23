@@ -1,6 +1,6 @@
 ﻿namespace libpeerlinker.FileHandling;
 
-// Represents a file which is provided in a tracker.
+// Represents a file named inside the torrent metadata.
 public record FileEntry
 {
     public required Int64 NumPieces;

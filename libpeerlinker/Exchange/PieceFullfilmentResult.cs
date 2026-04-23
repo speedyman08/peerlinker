@@ -3,7 +3,8 @@ using libpeerlinker.Messages;
 
 namespace libpeerlinker.Exchange;
 
-public class PieceFullfilmentResult
+// A DTO that represents the results from one round of piece fulfillment 
+public class PieceFulfillmentResult
 {
     public List<Block> ReceivedBlocks { get; set; }
     public HashSet<Message> RemainingRequestsNotSent { get; set; }

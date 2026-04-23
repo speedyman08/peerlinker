@@ -2,6 +2,9 @@
 using BencodeNET.Objects;
 namespace libpeerlinker;
 
+/// <summary>
+/// Small helper to extract values from Bencode dictionaries
+/// </summary>
 public class BencodeUtility
 {
     public static T GetKeyExcept<T>(BDictionary benDict, string key)

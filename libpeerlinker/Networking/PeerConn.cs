@@ -9,7 +9,9 @@ namespace libpeerlinker.Peers;
 
 
 /// <summary>
-///  A shim for a TCP connection. Long running.
+///  PeerConn is a shim for a TCP connection, it provides various helper methods for sending messages, and proviedes a unified way to
+///  handle inbound messages with the Messages property. It also stores the state of relationship between us and the peer
+///  like if we're choked or we choked the peer, the peer's BitField, giving us info about what pieces they have
 /// </summary>
 public class PeerConn : IDisposable
 {

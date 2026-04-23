@@ -2,7 +2,9 @@ using System.Buffers.Binary;
 using libpeerlinker.Messages;
 
 namespace libpeerlinker.Core;
-
+/// <summary>
+/// A block of data received from a peer, which is a shim over a Piece message.
+/// </summary>
 public class Block
 {
     public required int PieceIdx { get; init; }

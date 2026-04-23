@@ -11,7 +11,8 @@ using libpeerlinker.Utility;
 namespace libpeerlinker.Tracking;
 
 /// <summary>
-/// A class which represents a tracker
+/// Tracker represents the tracker server defined in torrent metadata, it allows us to join the swarm officially and get
+/// an initial list of peers to attempt a connection to with the Announce request.
 /// </summary>
 public class Tracker
 {
