@@ -3,6 +3,8 @@ My goal is to have a class library of BitTorrent like the C++ library "libtorren
 
 At this point in time, peerlinker can download entire files. I tested it with a few linux distro ISOs. It maxed out my available bandwidth, downloading at an average of 25mb/s.
 
+Around ~1500 loc
+
 ## Features
 - Truly concurrent piece fetching with 30 active connections
 - Peer discovery, handshake, etc.
@@ -24,6 +26,8 @@ At this point in time, peerlinker can download entire files. I tested it with a 
 - SHA1 verification of pieces, with bad ones automatically re-downloaded
 - Writing file to the disk
 
+## Proof of work
+https://github.com/user-attachments/assets/c302e353-bfc0-41a8-a179-e2c5c3b01f0c
 
 ## How to set it up
 - Take a sample .torrent file under /testfiles
